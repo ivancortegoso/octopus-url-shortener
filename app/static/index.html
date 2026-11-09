@@ -28,18 +28,40 @@
     font: 16px/1.55 Chromatophore, helvetica, arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 40px 16px 72px; }
-  header h1 {
-    font-size: 2.1rem; margin: 0 0 6px; font-weight: 700;
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 32px 16px 72px; }
+
+  /* Masthead */
+  .masthead {
+    display: flex; gap: 20px; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; margin-bottom: 28px;
+  }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .brand .logo { display: block; line-height: 0; border-radius: 10px; }
+  .brand .logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .brand h1 {
+    font-size: 1.9rem; margin: 0; font-weight: 700;
     letter-spacing: -0.02em; color: var(--accent);
   }
-  header p { margin: 0 0 28px; color: var(--muted); font-size: 0.95rem; }
-  form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+  .brand p { margin: 2px 0 0; color: var(--muted); font-size: 0.88rem; }
+  nav { display: flex; gap: 6px; }
+  nav a {
+    padding: 9px 16px; border-radius: var(--radius); text-decoration: none;
+    font-size: 0.92rem; color: var(--muted); border: 1px solid transparent;
+  }
+  nav a:hover { color: var(--ink); }
+  nav a[aria-current="page"] {
+    color: var(--accent); background: var(--raised); border-color: var(--line);
+  }
+  nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Forms */
+  form { margin: 0; }
+  .lookup { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
   select, input {
     padding: 12px 14px; font: inherit; color: var(--ink);
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   }
-  input { flex: 1 1 240px; }
+  .lookup input { flex: 1 1 240px; }
   input::placeholder { color: var(--muted); }
   select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button {
@@ -47,7 +69,16 @@
     color: var(--ink); background: var(--primary); border: 0; border-radius: var(--radius);
   }
   button:hover { filter: brightness(1.15); }
+  button:disabled { opacity: 0.6; cursor: progress; }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.03em; }
+  .field .hint { font-size: 0.74rem; color: var(--muted); }
+  .field--wide { grid-column: 1 / -1; }
+  .actions { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+  /* Shared surfaces */
   .msg {
     padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line);
     background: var(--panel); color: var(--muted);
@@ -67,6 +98,9 @@
     font-weight: 500; background: var(--raised); color: var(--accent);
   }
   .tag[data-tone="expired"] { background: transparent; color: var(--highlight); border: 1px solid currentColor; }
+  a.tag { text-decoration: none; }
+  a.tag:hover { filter: brightness(1.2); text-decoration: underline; }
+  a.tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .qr { text-align: center; }
   .qr img {
     width: 136px; height: 136px; image-rendering: pixelated;
@@ -90,10 +124,24 @@
     font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.07em;
     color: var(--muted); margin: 0 0 16px; font-weight: 500;
   }
+
+  /* Charts. The value rides on the bar as a tooltip rather than a title attribute, which
+     the browser only reveals after a pause and renders in its own style. */
   .bars { display: flex; align-items: flex-end; gap: 3px; height: 118px; }
-  .bars div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
-  .bars i { display: block; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .bars .column { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bars i { display: block; position: relative; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .bars i::after {
+    content: attr(data-value);
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--raised); color: var(--ink);
+    font-size: 0.74rem; font-weight: 500; font-style: normal; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
+  }
+  .bars .column:hover i::after, .bars .column:focus-within i::after { opacity: 1; }
+  .bars .column:hover i { filter: brightness(1.2); }
   .bars span { margin-top: 6px; font-size: 0.62rem; color: var(--muted); text-align: center; }
+
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
   th {
@@ -103,9 +151,6 @@
   td:last-child, th:last-child { text-align: right; }
   tr:last-child td { border-bottom: 0; }
   td .sub { display: block; color: var(--muted); font-size: 0.78rem; }
-  a.tag { text-decoration: none; }
-  a.tag:hover { filter: brightness(1.2); text-decoration: underline; }
-  a.tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   td a { color: var(--accent); text-decoration: none; }
   td a:hover { text-decoration: underline; }
   td a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
@@ -117,12 +162,30 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>Link analytics</h1>
-    <p>Look up a single short link, or a whole campaign across its placements.</p>
-  </header>
+  <div class="masthead">
+    <div class="brand">
+      <a class="logo" href="/app" aria-label="Back to the start">
+        <svg width="44" height="44" viewBox="0 0 32 32" role="img" aria-hidden="true">
+          <rect width="32" height="32" rx="9" fill="#5840ff"/>
+          <g stroke="#60f0f8" stroke-width="2.6" stroke-linecap="round" fill="none">
+            <path d="M12.5 19.5l7-7"/>
+            <path d="M14.8 10.6l1.6-1.6a4.2 4.2 0 0 1 6 6l-1.6 1.6"/>
+            <path d="M17.2 21.4l-1.6 1.6a4.2 4.2 0 0 1-6-6l1.6-1.6"/>
+          </g>
+        </svg>
+      </a>
+      <div>
+        <h1>Link analytics</h1>
+        <p>Create a short link, or read how one is performing.</p>
+      </div>
+    </div>
+    <nav aria-label="Sections">
+      <a id="nav-home" href="/app">Home</a>
+      <a id="nav-search" href="/app?view=search">Search</a>
+    </nav>
+  </div>
 
-  <form id="lookup">
+  <form id="lookup" class="lookup">
     <label for="mode" hidden>What to look up</label>
     <select id="mode" name="mode">
       <option value="code">Link</option>
@@ -134,6 +197,45 @@
   </form>
 
   <p id="message" class="msg" hidden></p>
+
+  <section id="create" class="card" hidden>
+    <h3>Create a short link</h3>
+    <form id="create-form">
+      <div class="fields">
+        <div class="field field--wide">
+          <label for="f-url">Destination URL (required)</label>
+          <input id="f-url" name="url" type="url" placeholder="https://example.com/offers" required>
+        </div>
+        <div class="field">
+          <label for="f-label">Label</label>
+          <input id="f-label" name="label" maxlength="200" placeholder="Text message to customers">
+        </div>
+        <div class="field">
+          <label for="f-code">Custom code</label>
+          <input id="f-code" name="code" pattern="[A-Za-z0-9_-]{3,32}" placeholder="black-friday">
+          <span class="hint">Letters, digits, hyphens and underscores. 3 to 32 characters.</span>
+        </div>
+        <div class="field">
+          <label for="f-campaign">Campaign</label>
+          <input id="f-campaign" name="campaign" maxlength="100" placeholder="black-friday-go">
+          <span class="hint">Groups placements so they can be read together.</span>
+        </div>
+        <div class="field">
+          <label for="f-expires">Expires at (UTC)</label>
+          <input id="f-expires" name="expires_at" type="datetime-local">
+        </div>
+        <div class="field">
+          <label for="f-fallback">Fallback URL</label>
+          <input id="f-fallback" name="fallback_url" type="url" placeholder="https://example.com/tariffs">
+          <span class="hint">Where visitors go once it has expired. Without one, an expired link answers 410.</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Create short link</button>
+        <span id="create-message" class="empty"></span>
+      </div>
+    </form>
+  </section>
 
   <div id="link-report" class="stack" hidden>
     <section class="card destination">
@@ -179,7 +281,7 @@
 
   <div id="campaign-report" class="stack" hidden>
     <section class="card">
-      <h2 id="campaign-name" style="margin:0 0 4px;font-size:1rem"></h2>
+      <h2 id="campaign-name" style="margin:0 0 4px;font-size:1.1rem"></h2>
       <p class="meta">Every placement carrying this campaign, ranked by the traffic it brought.</p>
     </section>
 
@@ -207,7 +309,10 @@
 </div>
 
 <script>
-  const form = document.getElementById("lookup");
+  const lookupForm = document.getElementById("lookup");
+  const createForm = document.getElementById("create-form");
+  const createSection = document.getElementById("create");
+  const createMessage = document.getElementById("create-message");
   const modeField = document.getElementById("mode");
   const termField = document.getElementById("term");
   const message = document.getElementById("message");
@@ -224,6 +329,18 @@
     return trimmed.split("/").pop() || "";
   }
 
+  function markSection(section) {
+    for (const [id, active] of [
+      ["nav-home", section === "home"],
+      ["nav-search", section === "search"],
+    ]) {
+      const link = document.getElementById(id);
+      if (active) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    }
+    createSection.hidden = section !== "home";
+  }
+
   function show(text, tone) {
     message.textContent = text;
     message.dataset.tone = tone || "";
@@ -236,6 +353,9 @@
     message.hidden = true;
     linkReport.hidden = section !== linkReport;
     campaignReport.hidden = section !== campaignReport;
+    // A report is the result of a lookup, so the header follows the reader there and the
+    // creation form steps out of the way.
+    markSection("search");
   }
 
   function formatMoment(value) {
@@ -252,13 +372,16 @@
       ...labels.map((label) => {
         const hits = counts[label] || 0;
         const column = document.createElement("div");
+        column.className = "column";
+        column.tabIndex = 0;
         const bar = document.createElement("i");
         bar.style.height = `${(hits / peak) * 100}%`;
         bar.style.opacity = hits ? "1" : "0.18";
+        bar.dataset.value = `${label} · ${hits} click${hits === 1 ? "" : "s"}`;
         const caption = document.createElement("span");
         caption.textContent = label;
         column.append(bar, caption);
-        column.title = `${label}: ${hits} click${hits === 1 ? "" : "s"}`;
+        column.setAttribute("aria-label", bar.dataset.value);
         return column;
       }),
     );
@@ -356,7 +479,6 @@
     const url = document.getElementById("url");
     url.textContent = stats.url;
     url.href = stats.url;
-
     renderLifetime(stats);
 
     const qrPath = `/qr/${encodeURIComponent(stats.code)}`;
@@ -437,11 +559,66 @@
     }
   }
 
+  /** Turn whatever the API put in `detail` into one line a person can act on. */
+  function describeFailure(status, detail) {
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => (item.field ? `${item.field}: ${item.message}` : item.message))
+        .join("; ");
+    }
+    if (typeof detail === "string" && detail) return detail;
+    return `The API answered with HTTP ${status}.`;
+  }
+
+  /** Collect the filled-in fields, leaving the empty ones out of the request entirely. */
+  function createPayload() {
+    const data = new FormData(createForm);
+    const payload = {};
+    for (const [key, raw] of data.entries()) {
+      const value = String(raw).trim();
+      if (!value) continue;
+      // A datetime-local field has no zone; the API reads a bare timestamp as UTC, which
+      // is what the label above the field says.
+      payload[key] = key === "expires_at" ? `${value}:00Z` : value;
+    }
+    return payload;
+  }
+
+  createForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = createForm.querySelector("button[type=submit]");
+    submit.disabled = true;
+    createMessage.textContent = "Creating…";
+    createMessage.style.color = "";
+
+    try {
+      const response = await fetch("/shorten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createPayload()),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        createMessage.textContent = describeFailure(response.status, payload.detail);
+        createMessage.style.color = "var(--highlight)";
+        return;
+      }
+      // Straight to the new link's report, which is where its QR code lives.
+      location.href = `/app?code=${encodeURIComponent(payload.code)}`;
+    } catch {
+      createMessage.textContent = "The API could not be reached. Is the service running?";
+      createMessage.style.color = "var(--highlight)";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   modeField.addEventListener("change", () => {
     termField.placeholder = PLACEHOLDERS[modeField.value];
   });
 
-  form.addEventListener("submit", (event) => {
+  lookupForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const term = extractTerm(termField.value);
     if (!term) {
@@ -451,16 +628,20 @@
     lookup(modeField.value, term);
   });
 
-  // A term in the address bar (/app?code=bf-sms, /app?campaign=black-friday-go) loads
-  // straight away, so a link to a specific report can be shared.
+  // The address bar decides what opens: a code or a campaign loads its report, ?view=search
+  // opens the lookup on its own, and anything else is the start page with the form.
   const params = new URLSearchParams(location.search);
   const requestedCampaign = params.get("campaign");
   const requestedCode = params.get("code");
+
   if (requestedCampaign || requestedCode) {
     modeField.value = requestedCampaign ? "campaign" : "code";
     termField.placeholder = PLACEHOLDERS[modeField.value];
     termField.value = requestedCampaign || requestedCode;
-    form.requestSubmit();
+    markSection("search");
+    lookupForm.requestSubmit();
+  } else {
+    markSection(params.get("view") === "search" ? "search" : "home");
   }
 </script>
 </body>

@@ -3,6 +3,8 @@
 A small web service that shortens URLs and reports click analytics, built with FastAPI.
 Written as a hiring exercise inside a 3-hour timebox.
 
+![The start page: look up a link, or create one](docs/home.png)
+
 ![A campaign read across its four placements](docs/campaign.png)
 
 <details>
@@ -27,7 +29,8 @@ uv run uvicorn app.main:app --reload
 The service listens on `http://localhost:8000`.
 
 - `http://localhost:8000/docs` — interactive API documentation, generated from the code
-- `http://localhost:8000/app` — a page for reading a link, or a campaign, in the browser
+- `http://localhost:8000/app` — create a short link, or look one up
+- `http://localhost:8000/app?view=search` — the lookup on its own
 - `http://localhost:8000/health` — the liveness check
 
 To see the page with something in it, seed a demonstration campaign first:
