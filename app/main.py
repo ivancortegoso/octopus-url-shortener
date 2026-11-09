@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import Settings, get_settings
 from app.dependencies import get_storage
-from app.domain import Click, Link, generate_code, utc_now
+from app.domain import Click, Link, generate_code, is_reserved, utc_now
 from app.schemas import ShortenRequest, ShortenResponse, StatsResponse
 from app.storage import CodeAlreadyExistsError, Storage
 
@@ -46,13 +46,39 @@ async def validation_error_handler(_: Request, error: RequestValidationError) ->
 @app.post("/shorten", response_model=ShortenResponse, status_code=status.HTTP_201_CREATED)
 def shorten(payload: ShortenRequest, storage: StorageDep, settings: SettingsDep) -> ShortenResponse:
     """Store a URL and return the code that resolves to it."""
-    link = _store_with_unique_code(
-        storage=storage,
-        url=str(payload.url),
-        label=payload.label,
-        code_length=settings.code_length,
-    )
+    if payload.code is not None:
+        link = _store_with_requested_code(
+            storage=storage, url=str(payload.url), label=payload.label, code=payload.code
+        )
+    else:
+        link = _store_with_unique_code(
+            storage=storage,
+            url=str(payload.url),
+            label=payload.label,
+            code_length=settings.code_length,
+        )
     return ShortenResponse(code=link.code, short_url=f"{settings.base_url}/{link.code}")
+
+
+def _store_with_requested_code(
+    *, storage: Storage, url: str, label: str | None, code: str
+) -> Link:
+    """Store a link under a caller-chosen code, refusing one that is taken or reserved."""
+    if is_reserved(code):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"The code {code!r} is reserved by the service.",
+        )
+
+    link = Link(code=code, url=url, label=label, created_at=utc_now())
+    try:
+        storage.add_link(link)
+    except CodeAlreadyExistsError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"The code {code!r} is already taken.",
+        ) from error
+    return link
 
 
 def _store_with_unique_code(

@@ -30,7 +30,7 @@ Configuration is read from the environment, all of it optional:
 
 | Method | Path | Behaviour |
 | --- | --- | --- |
-| `POST` | `/shorten` | Stores a URL, returns its code and short URL. 201 on success, 400 on an invalid URL |
+| `POST` | `/shorten` | Stores a URL, returns its code and short URL. 201 on success, 400 on an invalid URL, 409 on a taken or reserved custom code |
 | `GET` | `/{code}` | Redirects with 302 to the original URL and records the click. 404 if the code is unknown |
 | `GET` | `/stats/{code}` | Reports the original URL and the click analytics. 404 if the code is unknown |
 
@@ -60,6 +60,18 @@ curl localhost:8000/stats/3TBphfZ
 #   "clicks_per_day": {"2026-11-09": 1},
 #   "top_referrers": {"https://news.example": 1}
 # }
+
+# Ask for a readable code instead of a generated one
+curl -X POST localhost:8000/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/offers","code":"black-friday"}'
+# {"code":"black-friday","short_url":"http://localhost:8000/black-friday"}
+
+# A code already taken, or reserved by the service, is refused
+curl -X POST localhost:8000/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","code":"black-friday"}'
+# HTTP/1.1 409 Conflict
 
 # An invalid URL is rejected
 curl -X POST localhost:8000/shorten \
@@ -98,6 +110,10 @@ database file.
   invites enumeration; hashing the URL makes shortening the same URL twice impossible.
 - **No IP addresses.** Clicks record the referrer and the user agent. An IP is personal
   data under the GDPR and none of these statistics need it.
+- **Readable custom codes.** Not asked for, but a shortener whose links go into
+  campaigns and printed material needs `/black-friday`, not `/3TBphfZ`. Requested codes
+  are checked against the paths the service serves itself and against codes already
+  taken, both answering 409.
 - **A connection per operation.** FastAPI runs synchronous endpoints in a thread pool,
   where sharing one SQLite connection is unsafe. Opening per call is cheap and correct;
   WAL mode keeps readers from blocking the writer.

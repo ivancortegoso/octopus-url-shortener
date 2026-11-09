@@ -32,25 +32,25 @@ it as a known limitation, move on.
 
 ### Explicit
 
-- [ ] `POST /shorten` accepts `{"url": "<valid http(s) URL>", "label": "optional string"}`
-- [ ] `POST /shorten` returns `{"code": "abc123", "short_url": "http://localhost:8000/abc123"}`
-- [ ] `GET /{code}` redirects with 302 to the original URL
-- [ ] `GET /{code}` records a click event
-- [ ] `GET /stats/{code}` returns the original URL, the total click count and any further
+- [x] `POST /shorten` accepts `{"url": "<valid http(s) URL>", "label": "optional string"}`
+- [x] `POST /shorten` returns `{"code": "abc123", "short_url": "http://localhost:8000/abc123"}`
+- [x] `GET /{code}` redirects with 302 to the original URL
+- [x] `GET /{code}` records a click event
+- [x] `GET /stats/{code}` returns the original URL, the total click count and any further
       recorded information worth exposing
-- [ ] Invalid URL returns 400
-- [ ] Unknown code returns 404
-- [ ] README with local run instructions, example curl commands and 5-10 lines of design notes
-- [ ] A couple of minimal pytest tests, shortening and redirect among them
-- [ ] Python 3.11+ and FastAPI
+- [x] Invalid URL returns 400
+- [x] Unknown code returns 404
+- [x] README with local run instructions, example curl commands and 5-10 lines of design notes
+- [x] A couple of minimal pytest tests, shortening and redirect among them
+- [x] Python 3.11+ and FastAPI
 - [ ] Code in a GitHub repository
 
 ### Implied
 
-- [ ] Short codes must be unique, and collisions handled rather than assumed away
+- [x] Short codes must be unique, and collisions handled rather than assumed away
 - [ ] The redirect path must stay cheap: it is the hot path of the service
-- [ ] Click data must survive a restart for the analytics to mean anything
-- [ ] Reserved paths (`/docs`, `/stats`, `/health`) must not be claimable as short codes
+- [x] Click data must survive a restart for the analytics to mean anything
+- [x] Reserved paths (`/docs`, `/stats`, `/health`) must not be claimable as short codes
 
 ### Out of scope
 
@@ -62,23 +62,25 @@ it as a known limitation, move on.
 
 ### Slice 1 - Create a short link
 
-- [ ] Domain: short code generation with collision handling
-- [ ] Storage: persist a link
-- [ ] `POST /shorten` with URL validation returning 400
-- [ ] Tests: happy path and a rejected URL
+- [x] Domain: short code generation with collision handling
+- [x] Storage: persist a link
+- [x] `POST /shorten` with URL validation returning 400
+- [x] Tests: happy path and a rejected URL
 
 ### Slice 2 - Redirect and record the click
 
-- [ ] `GET /{code}` returning 302, and 404 for an unknown code
-- [ ] Storage: append a click event
-- [ ] Tests: redirect target, 404, and that the click is recorded
+- [x] `GET /{code}` returning 302, and 404 for an unknown code
+- [x] Storage: append a click event
+- [x] Tests: redirect target, 404, and that the click is recorded
 
 ### Slice 3 - Expose the statistics
 
-- [ ] `GET /stats/{code}` with the original URL and the click total
-- [ ] The further analytics worth exposing
-- [ ] Tests: counts reflect the clicks recorded
+- [x] `GET /stats/{code}` with the original URL and the click total
+- [x] The further analytics worth exposing
+- [x] Tests: counts reflect the clicks recorded
 
-### Slice 4 - One feature of our own
+### Slice 4 - One feature of our own: readable custom codes
 
-- [ ] [FILL: decided at the end of slice 3, time permitting]
+- [x] Optional `code` in the request, validated for shape
+- [x] 409 for a code already taken or reserved by the service
+- [x] Tests for the happy path and each refusal

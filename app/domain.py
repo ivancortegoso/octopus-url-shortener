@@ -51,3 +51,8 @@ def generate_code(length: int) -> str:
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def is_reserved(code: str) -> bool:
+    """Report whether a code names a path the service serves itself."""
+    return code.lower() in RESERVED_CODES
