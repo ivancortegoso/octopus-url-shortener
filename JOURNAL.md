@@ -19,6 +19,11 @@ afterwards.
 | 22:40 | Hardened all four. Rate-limit clients are keyed by a salted hash rather than their address, so no raw IP is held even in memory |
 | 22:50 | Added expiry, and the analytics a campaign actually needs. Country comes from the edge as a two-letter code and the user agent is reduced to a device category, so no personal data is stored |
 | 23:05 | Added the QR endpoint and a page that reads the public statistics endpoint, plus a seeding script so the page has something to show |
+| 23:10 | Added request correlation, JSON access logs and a health endpoint |
+| 23:12 | Separated automated resolutions from real ones, and found that HEAD was answering 405 — which contradicted the brief's own `curl -I` example |
+| 23:14 | Added campaigns, the channel marker on QR codes, fallback destinations and tracking-parameter forwarding |
+| 23:16 | Decided against counting unique visitors: a hashed IPv4 address is reversible by exhaustion, so it would have made the privacy claim false |
+| 23:20 | Left the destination allowlist out as an open question for the business, since it depends on who may create links |
 
 ## Known limitations
 

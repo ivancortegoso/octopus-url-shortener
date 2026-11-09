@@ -118,3 +118,55 @@ next step.
 the API, needs no templating dependency, and demonstrates that the API is usable. It is
 one static file with no build step. The brief asked for a web service; this is there to
 show the analytics to someone who does not read JSON, and nothing depends on it.
+
+## 13. Automated resolutions counted apart, not discarded
+
+**Alternative:** counting every resolution as a click, or dropping the automated ones.
+
+**Why:** both mislead. A total that includes link checkers and the preview fetches chat
+apps make overstates what a campaign achieved; one that silently drops them hides that a
+link is being fetched at all, which is itself worth knowing. Two signals identify them
+cheaply: a HEAD request asks where a code leads without opening it, and a user agent may
+name itself. It is a heuristic and the code says so, because user agents are self-reported.
+
+## 14. A channel marker on the QR code
+
+**Alternative:** one code per channel, so a poster and a text message use different links.
+
+**Why:** separate codes would answer the same question, but they fragment the link: the
+same campaign placement then has two sets of statistics to add up, and two QR codes to keep
+straight. Encoding the marker in what the QR contains keeps one code with one report, and
+the marker is stripped before the redirect so the destination never sees it.
+
+## 15. A fallback destination instead of a bare 410
+
+**Alternative:** answering 410 for every expired link.
+
+**Why:** a short link printed on a bill or a poster keeps circulating long after the
+campaign behind it ends, and sending those people to the tariff listing serves them better
+than an error page. The resolutions that arrive after expiry are recorded separately, so
+the campaign's figures stay honest while still showing that the printed copy is working.
+410 remains the answer when no fallback was set, because then there is genuinely nowhere
+to send anyone.
+
+## 16. No unique-visitor count
+
+**Alternative:** storing a keyed hash of the client address, the usual way this is done.
+
+**Why:** hashing an IP address is pseudonymisation, not anonymisation. IPv4 has about four
+billion addresses, so with the key in hand every one of them can be hashed and compared in
+seconds; the GDPR treats the result as personal data for exactly that reason, and rotating
+the key daily narrows the window without changing the category. Counting unique visitors
+honestly means accepting personal data, a retention policy and a lawful basis. For an
+exercise whose whole analytics story is that it holds none, that trade is not worth making,
+so the figure is absent and the reason is written down.
+
+## 17. A campaign is a label on a link
+
+**Alternative:** a campaigns table with links referencing it.
+
+**Why:** at this size the label answers the question — which placement brought the traffic —
+with one indexed column and no second table to create, join or migrate. The moment a
+campaign needs properties of its own, a budget or an owner or a date range, it becomes an
+entity and this becomes a foreign key. Reaching for the table first would be building for a
+requirement nobody has stated.

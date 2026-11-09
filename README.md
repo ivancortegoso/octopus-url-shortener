@@ -3,7 +3,14 @@
 A small web service that shortens URLs and reports click analytics, built with FastAPI.
 Written as a hiring exercise inside a 3-hour timebox.
 
-![The analytics page showing a seeded campaign](docs/dashboard.png)
+![A campaign read across its four placements](docs/campaign.png)
+
+<details>
+<summary>The per-link view</summary>
+
+![One link's performance](docs/dashboard.png)
+
+</details>
 
 ## Requirements
 
@@ -20,13 +27,19 @@ uv run uvicorn app.main:app --reload
 The service listens on `http://localhost:8000`.
 
 - `http://localhost:8000/docs` — interactive API documentation, generated from the code
-- `http://localhost:8000/app` — a page for reading a link's performance
+- `http://localhost:8000/app` — a page for reading a link, or a campaign, in the browser
+- `http://localhost:8000/health` — the liveness check
 
-To see the page with something in it, seed a demonstration link first:
+To see the page with something in it, seed a demonstration campaign first:
 
 ```bash
 uv run python -m scripts.seed_demo
 ```
+
+That builds four placements of one Black Friday campaign with a fortnight of clicks, each
+channel decaying the way it really would: a text message is read the day it arrives, a
+printed poster keeps working. Then open
+`/app?campaign=black-friday-go` or `/app?code=bf-sms`.
 
 Configuration is read from the environment, all of it optional:
 
@@ -44,10 +57,12 @@ Configuration is read from the environment, all of it optional:
 | Method | Path | Behaviour |
 | --- | --- | --- |
 | `POST` | `/shorten` | Stores a URL. 201 on success, 400 on an invalid or unsafe URL, 409 on a taken or reserved code, 429 past the allowance, 503 if no code could be allocated |
-| `GET` | `/{code}` | Redirects with 302 and records the click. 404 if unknown, 410 if expired |
+| `GET`, `HEAD` | `/{code}` | Redirects with 302 and records the click. 404 if unknown; once expired, redirects to the fallback if one was set and answers 410 otherwise |
 | `GET` | `/stats/{code}` | Reports the destination and the click analytics. 404 if unknown |
+| `GET` | `/stats/campaign/{campaign}` | Ranks every placement carrying one campaign. 404 if no link does |
 | `GET` | `/qr/{code}` | Renders the short link as a PNG QR code. 404 if unknown |
 | `GET` | `/app` | The analytics page |
+| `GET` | `/health` | Reports that the service is running |
 
 ## Example usage
 
@@ -58,11 +73,30 @@ curl -X POST localhost:8000/shorten \
   -d '{"url":"https://example.com","label":"home"}'
 # {"code":"3TBphfZ","short_url":"http://localhost:8000/3TBphfZ","expires_at":null}
 
-# Ask for a readable code, and a date it should stop working
+# Place a campaign: a readable code, an expiry, somewhere to send people afterwards
 curl -X POST localhost:8000/shorten \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com/offers","code":"black-friday","expires_at":"2026-12-01T00:00:00Z"}'
-# {"code":"black-friday","short_url":"http://localhost:8000/black-friday","expires_at":"2026-12-01T00:00:00Z"}
+  -d '{"url":"https://example.com/offers","code":"bf-sms","label":"Text message",
+       "campaign":"black-friday-go","expires_at":"2026-12-01T00:00:00Z",
+       "fallback_url":"https://example.com/tariffs"}'
+# {"code":"bf-sms","short_url":"http://localhost:8000/bf-sms",
+#  "expires_at":"2026-12-01T00:00:00Z","fallback_url":"https://example.com/tariffs",
+#  "campaign":"black-friday-go"}
+
+# Read the campaign across its placements
+curl localhost:8000/stats/campaign/black-friday-go
+# {
+#   "campaign": "black-friday-go",
+#   "total_clicks": 395,
+#   "bot_clicks": 35,
+#   "links": [
+#     {"code": "bf-sms", "label": "Text message to customers", "total_clicks": 125},
+#     {"code": "bf-instagram", "label": "Instagram post", "total_clicks": 109},
+#     {"code": "bf-email", "label": "Newsletter", "total_clicks": 84},
+#     {"code": "bf-poster", "label": "Dealership poster", "total_clicks": 77}
+#   ],
+#   "clicks_by_channel": {"link": 318, "qr": 77}
+# }
 
 # Follow it
 curl -I localhost:8000/black-friday
@@ -81,12 +115,20 @@ curl localhost:8000/stats/black-friday
 #   "clicks_by_hour": {"18": 31, "19": 34, "20": 27, ...},
 #   "clicks_by_weekday": {"Mon": 44, "Tue": 29, ...},
 #   "clicks_by_country": {"ES": 141, "GB": 47, ...},
-#   "clicks_by_device": {"mobile": 169, "desktop": 88, "bot": 11},
+#   "clicks_by_device": {"mobile": 169, "desktop": 88},
+#   "clicks_by_channel": {"link": 134, "qr": 35},
+#   "bot_clicks": 14,
+#   "expired_clicks": 0,
 #   "top_referrers": {"https://www.instagram.com/": 100, ...}
 # }
 
-# Fetch the QR code
-curl -o qr.png localhost:8000/qr/black-friday
+# Fetch the QR code. The image encodes the link with a channel marker, so a scan is
+# distinguishable from a tap in the statistics.
+curl -o qr.png localhost:8000/qr/bf-poster
+
+# Tracking parameters on the short link are carried to the destination
+curl -I "localhost:8000/bf-sms?utm_source=sms"
+# location: https://example.com/offers?utm_source=sms
 
 # A taken or reserved code is refused
 curl -X POST localhost:8000/shorten \
@@ -114,7 +156,7 @@ uv run ruff check .
 uv run mypy app tests scripts
 ```
 
-67 tests. They drive the application through FastAPI's test client against the in-memory
+87 tests. They drive the application through FastAPI's test client against the in-memory
 storage, so the real routes, validation and status codes are exercised without touching a
 database file.
 
@@ -135,8 +177,15 @@ strictest of them rather than to each one separately.
 - **Rate limiting without retention.** Clients are keyed by a salted hash of their
   address, held only for the length of the window, with the salt generated per process.
 
+**No unique-visitor count.** It would be the obvious next figure, and the usual way to get
+it is to store a hash of the IP address. That is not anonymisation: with a static key, the
+four billion IPv4 addresses can be hashed exhaustively in seconds, which is why the GDPR
+treats a hashed address as pseudonymised personal data rather than anonymous. Counting
+unique visitors honestly means either keeping personal data under a retention policy and a
+lawful basis, or not counting them. This service does not count them.
+
 What this costs: the analytics cannot answer anything about individuals or returning
-visitors. That is the intended trade.
+visitors. That is the intended trade, not an omission.
 
 ## Design notes
 
@@ -162,8 +211,17 @@ visitors. That is the intended trade.
 - **A connection per operation.** FastAPI runs synchronous endpoints in a thread pool,
   where sharing one SQLite connection is unsafe. Opening per call is cheap and correct;
   WAL mode keeps readers from blocking the writer.
-- **The page is a client, not a view.** It reads the same public endpoint anyone else
+- **The page is a client, not a view.** It reads the same public endpoints anyone else
   would, with no build step and no frontend dependencies, so it cannot drift from the API.
+- **Automated traffic is counted apart, not discarded.** A figure that mixes link checkers
+  and chat previews into "clicks" misleads whoever placed the link, and one that silently
+  drops them hides that a link is being fetched at all. Both are reported.
+- **An expired link with a fallback still redirects.** A campaign page that has ended is
+  better answered with the tariff listing than with an error, and the late resolutions are
+  recorded separately so the figures stay honest.
+- **A campaign is a label, not an entity.** Grouping links by a string needs no second table
+  and no migration, and answers the question a marketing team asks. A real product would
+  promote it to a table once campaigns had properties of their own.
 
 ## Known limitations
 
@@ -183,19 +241,46 @@ visitors. That is the intended trade.
   allowance; a shared store such as Redis is the way out.
 - **Destination checks read the host as written.** A public domain that resolves to a
   private address is not caught.
+- **Resolutions are recorded even when the answer is 410**, so an expired code can be used
+  to grow the clicks table. Rate limiting covers creation, not resolution.
+- **Bot detection is a heuristic.** User agents are self-reported, so a determined client
+  is counted as a person and an unlisted preview service is counted as one too.
 
 ## Where this would go next
 
 The analytics are the part of this service with the most room to grow, and the questions
 a marketing team actually asks point the way:
 
-1. **Campaigns.** Links grouped under a campaign, so performance is read per campaign
-   rather than per link.
-2. **Accounts and ownership.** A `created_by` on each link, which turns the statistics
-   from public into private and makes a management view possible.
+1. **A management token per link**, issued at creation and required to read or change it.
+   This is the right fix for public statistics, and it earns its keep in three situations:
+   an agency placing a client's campaign should see its own numbers and not a competitor's;
+   a dealership selling electric vehicles should see its links and not another dealership's;
+   and whoever sent a text message to fifty thousand customers with the wrong destination
+   should be able to repoint it without sending a correction — which matters more again for
+   a link printed on a bill, where there is nothing to resend. It was left out rather than
+   half-built.
+2. **Accounts and ownership**, which is what a token is a stand-in for.
 3. **Rollups.** A table of per-hour totals written as clicks arrive, so the dashboards stop
    aggregating raw rows.
 4. **Time-of-day analysis in the reader's zone.** Which, for an energy retailer, is the
    interesting question: when a tariff campaign is engaged with says something about when
    people are willing to shift consumption.
 5. **Caching the redirect**, the one change that most affects how this behaves under load.
+6. **Sentry for errors and a `/metrics` endpoint**, which is where the correlation ids and
+   structured logs already point.
+
+## An open question for the business
+
+Should the service accept any destination, or only an allowlist of the company's own
+domains?
+
+A public shortener has to take any valid URL, which is what the brief asks for and what
+this service does. An internal one should not: a shortener that accepts anything lets
+someone mint a link on a trusted domain that leads to a page imitating the company, and a
+text message carrying it would pass the filters a bare domain would not. The code already
+refuses private and loopback destinations, but a convincing phishing page sits on a
+perfectly routable host.
+
+The answer depends on who is allowed to create links, which the brief does not say. It is
+a configuration flag away either direction, and the brief invites asking — so this is the
+question I would put to Enrique Tasa before choosing.
