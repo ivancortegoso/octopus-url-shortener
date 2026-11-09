@@ -23,6 +23,7 @@
     --radius: 12px;
   }
   * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
     font: 16px/1.55 Chromatophore, helvetica, arial, sans-serif;
@@ -58,8 +59,16 @@
   form { margin: 0; }
   .lookup { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
   select, input {
-    padding: 12px 14px; font: inherit; color: var(--ink);
+    padding: 12px 14px; font: inherit; line-height: 1.5; color: var(--ink);
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  /* A select sizes itself from its own metrics, so without this it sits a pixel or two off
+     the inputs beside it. The arrow is drawn here because the browser's own sits flush
+     against the edge. */
+  select {
+    appearance: none; padding-right: 38px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23a49fc8' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px;
   }
   .lookup input { flex: 1 1 240px; }
   input::placeholder { color: var(--muted); }
@@ -75,6 +84,8 @@
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.03em; }
   .field .hint { font-size: 0.74rem; color: var(--muted); }
+  .field .error { font-size: 0.78rem; color: var(--highlight); }
+  .field input[aria-invalid="true"] { border-color: var(--highlight); }
   .field--wide { grid-column: 1 / -1; }
   .actions { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
@@ -208,7 +219,7 @@
 
   <section id="create" class="card" hidden>
     <h3>Create a short link</h3>
-    <form id="create-form">
+    <form id="create-form" novalidate>
       <div class="fields">
         <div class="field field--wide">
           <label for="f-url">Where the link should lead</label>
@@ -221,7 +232,12 @@
         </div>
         <div class="field">
           <label for="f-code">Choose the ending</label>
-          <input id="f-code" name="code" pattern="[A-Za-z0-9_-]{3,32}" placeholder="black-friday">
+          <input id="f-code" name="code" pattern="[A-Za-z0-9_\-]{3,32}"
+                 placeholder="black-friday">
+          <!-- The hyphen is escaped on purpose: a pattern attribute is compiled with the
+               regular expression `v` flag, under which a bare hyphen at the end of a
+               character class will not compile, and a pattern that fails to compile is
+               dropped by the browser without a word. -->
           <span class="hint">Makes the link readable, as in /black-friday. Leave it empty for a random one.</span>
         </div>
         <div class="field">
@@ -584,8 +600,74 @@
     return payload;
   }
 
+  const VALIDATION_MESSAGES = {
+    "f-url": {
+      valueMissing: "Enter where the link should lead.",
+      typeMismatch: "Enter a full web address, starting with http:// or https://",
+    },
+    "f-code": {
+      patternMismatch:
+        "Use 3 to 32 characters: letters, numbers, hyphens or underscores, with no spaces.",
+    },
+  };
+
+  /** Say what is wrong with a field, in this page's words rather than the browser's. */
+  function describeField(field) {
+    const messages = VALIDATION_MESSAGES[field.id] || {};
+    for (const reason of ["valueMissing", "typeMismatch", "patternMismatch"]) {
+      if (field.validity[reason] && messages[reason]) return messages[reason];
+    }
+    return field.validity.valid ? "" : "Check this field.";
+  }
+
+  function clearFieldError(field) {
+    field.removeAttribute("aria-invalid");
+    field.parentElement.querySelector(".error")?.remove();
+  }
+
+  function markFieldError(field, text) {
+    clearFieldError(field);
+    field.setAttribute("aria-invalid", "true");
+    const note = document.createElement("span");
+    note.className = "error";
+    note.textContent = text;
+    field.parentElement.append(note);
+  }
+
+  /**
+   * Report every invalid field at once and return whether the form may be sent.
+   *
+   * The form carries `novalidate`, so the browser does not draw its own bubble: that bubble
+   * speaks the browser's language rather than the page's, cannot be styled, and makes the
+   * browser scroll the page to anchor it.
+   */
+  function validateCreateForm() {
+    const fields = [...createForm.querySelectorAll("input")];
+    let firstInvalid = null;
+
+    for (const field of fields) {
+      if (field.checkValidity()) {
+        clearFieldError(field);
+        continue;
+      }
+      markFieldError(field, describeField(field));
+      firstInvalid = firstInvalid || field;
+    }
+
+    firstInvalid?.focus();
+    return firstInvalid === null;
+  }
+
+  for (const field of createForm.querySelectorAll("input")) {
+    field.addEventListener("input", () => clearFieldError(field));
+  }
+
   createForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!validateCreateForm()) {
+      createMessage.textContent = "";
+      return;
+    }
     const submit = createForm.querySelector("button[type=submit]");
     submit.disabled = true;
     createMessage.textContent = "Creating…";

@@ -214,3 +214,26 @@ way, only its clothing differs.
 
 The distinction is deliberately limited to that one route. `/stats` and `/qr` are consumed
 by programs, including this project's own page, and answer with a payload regardless.
+
+## 21. The form reports its own validation, and the error pages carry the header
+
+**Alternative:** the browser's built-in validation bubble.
+
+**Why:** the bubble is drawn by the browser, in the browser's interface language rather
+than the page's, in a style no stylesheet reaches, and showing it makes the browser scroll
+the page to anchor it. Marking the form `novalidate` keeps the constraints — they still
+drive each field's validity — while the page says what is wrong, beside the field, in its
+own words, clearing as soon as the field is touched. `aria-invalid` and the message beside
+the input carry the same information to a screen reader.
+
+Escaping the hyphen in that field's pattern is not cosmetic. A `pattern` attribute is
+compiled with the regular expression `v` flag, under which a bare hyphen at the end of a
+character class does not compile — and a pattern that fails to compile is dropped by the
+browser in silence, so every value passed. The server's own check was unaffected, because
+Python's regular expressions accept the bare hyphen, which is exactly why it went unnoticed:
+bad input was refused, just one layer later than intended.
+
+The two failure pages carry the header as well, so someone who lands on one can reach the
+tool rather than reaching a dead end. That is right while the service has no accounts;
+once a link belongs to someone, a page shown to the public should not advertise the tool
+that created it.

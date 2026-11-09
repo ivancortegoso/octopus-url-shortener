@@ -6,40 +6,81 @@
 <title>This link has expired</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235840FF'/%3E%3Cg stroke='%2360F0F8' stroke-width='2.6' stroke-linecap='round' fill='none'%3E%3Cpath d='M12.5 19.5l7-7'/%3E%3Cpath d='M14.8 10.6l1.6-1.6a4.2 4.2 0 0 1 6 6l-1.6 1.6'/%3E%3Cpath d='M17.2 21.4l-1.6 1.6a4.2 4.2 0 0 1-6-6l1.6-1.6'/%3E%3C/g%3E%3C/svg%3E">
 <style>
+  /* Same palette as the tool, so a visitor who lands here does not feel thrown somewhere
+     else. The masthead is repeated rather than shared: two static pages and no build step
+     make a template more machinery than the duplication costs. */
   :root {
-    --bg: #100030; --panel: #180048; --ink: #f0ffff; --muted: #a49fc8;
-    --line: rgba(240, 255, 255, 0.14); --primary: #5840ff; --accent: #60f0f8;
+    --bg: #100030; --panel: #180048; --raised: #2d1a83; --ink: #f0ffff;
+    --muted: #a49fc8; --line: rgba(240, 255, 255, 0.14);
+    --primary: #5840ff; --accent: #60f0f8; --radius: 12px;
   }
   * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; }
   body {
-    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
-    background: var(--bg); color: var(--ink);
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
     font: 16px/1.6 Chromatophore, helvetica, arial, sans-serif;
     -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column;
   }
-  main {
+  .wrap { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 16px; }
+  .masthead {
+    display: flex; gap: 20px; align-items: center; justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .brand .logo { display: block; line-height: 0; border-radius: 10px; }
+  .brand .logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .brand h1 {
+    font-size: 1.9rem; margin: 0; font-weight: 700;
+    letter-spacing: -0.02em; color: var(--accent);
+  }
+  .brand p { margin: 2px 0 0; color: var(--muted); font-size: 0.88rem; }
+  nav { display: flex; gap: 6px; }
+  nav a {
+    padding: 9px 16px; border-radius: var(--radius); text-decoration: none;
+    font-size: 0.92rem; color: var(--muted); border: 1px solid transparent;
+  }
+  nav a:hover { color: var(--ink); }
+  nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  main { flex: 1; display: grid; place-items: center; padding: 24px 16px 64px; }
+  .notice {
     max-width: 480px; width: 100%; text-align: center; padding: 40px 32px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   }
-  .mark { line-height: 0; margin-bottom: 24px; }
-  h1 { margin: 0 0 12px; font-size: 1.5rem; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
-  p { margin: 0; color: var(--muted); }
+  .notice h2 { margin: 0 0 12px; font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+  .notice p { margin: 0; color: var(--muted); }
 </style>
 </head>
 <body>
-<main>
-  <div class="mark">
-    <svg width="52" height="52" viewBox="0 0 32 32" role="img" aria-hidden="true">
-      <rect width="32" height="32" rx="9" fill="#5840ff"/>
-      <g stroke="#60f0f8" stroke-width="2.6" stroke-linecap="round" fill="none">
-        <path d="M12.5 19.5l7-7"/>
-        <path d="M14.8 10.6l1.6-1.6a4.2 4.2 0 0 1 6 6l-1.6 1.6"/>
-        <path d="M17.2 21.4l-1.6 1.6a4.2 4.2 0 0 1-6-6l1.6-1.6"/>
-      </g>
-    </svg>
+<div class="wrap">
+  <div class="masthead">
+    <div class="brand">
+      <a class="logo" href="/app" aria-label="Back to the start">
+        <svg width="44" height="44" viewBox="0 0 32 32" role="img" aria-hidden="true">
+          <rect width="32" height="32" rx="9" fill="#5840ff"/>
+          <g stroke="#60f0f8" stroke-width="2.6" stroke-linecap="round" fill="none">
+            <path d="M12.5 19.5l7-7"/>
+            <path d="M14.8 10.6l1.6-1.6a4.2 4.2 0 0 1 6 6l-1.6 1.6"/>
+            <path d="M17.2 21.4l-1.6 1.6a4.2 4.2 0 0 1-6-6l1.6-1.6"/>
+          </g>
+        </svg>
+      </a>
+      <div>
+        <h1>Link analytics</h1>
+        <p>Create a short link, or read how one is performing.</p>
+      </div>
+    </div>
+    <nav aria-label="Sections">
+      <a href="/app">Home</a>
+      <a href="/app?view=search">Search</a>
+    </nav>
   </div>
-  <h1>This link has expired</h1>
-  <p>It was set to stop working on a certain date, and that date has passed. If someone sent it to you, ask them for an up-to-date one.</p>
+</div>
+<main>
+  <div class="notice">
+    <h2>This link has expired</h2>
+    <p>It was set to stop working on a certain date, and that date has passed. If someone sent it to you, ask them for an up-to-date one.</p>
+  </div>
 </main>
 </body>
 </html>
