@@ -27,6 +27,14 @@ afterwards.
 | 23:25 | Dressed the page in the palette octopusenergy.es publishes, without its logo, wordmark or favicon |
 | 23:30 | Made each placement in a campaign a link to its own report, and the campaign pill a link back |
 | 23:32 | Found stored XSS in the page while doing that: the campaign name went into innerHTML, and the name is chosen by whoever creates the link. Rebuilt the line from DOM nodes and confirmed with an injected campaign that nothing executes |
+| 23:35 | Put the figure on each bar behind a hover, and made the bar being pointed at sit above the ones beside it rather than behind them |
+| 23:40 | Added the start page: the lookup and a create form, a masthead and navigation, so the service can be shown to someone who will not use curl |
+| 23:45 | Reworded every label and hint for the person using the tool rather than the person who wrote it, and moved the explanations behind an info icon so the form stays short |
+| 23:50 | Found the create form's code pattern silently dead: a trailing hyphen in the character class fails to compile under the regex `v` flag, so the browser drops the attribute without saying so and anything validated. Escaped it, and said why in the markup |
+| 23:52 | Replaced the browser's own validation bubble with per-field messages in the form's wording; the server already repeated every check, so nothing moved out of the API |
+| 23:55 | Fixed an expiry landing an hour or two out: the picker reads the local clock and the value was being sent as though it were UTC |
+| 00:00 | Added the page for an expired link and the page for an unknown code, chosen by the Accept header so a program still gets JSON |
+| 00:10 | Split readiness from liveness: `/health` answers without consulting anything, `/ready` consults the database and answers 503 when it cannot |
 
 ## Known limitations
 

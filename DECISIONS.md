@@ -68,6 +68,10 @@ deliverables. FastAPI generates interactive documentation at `/docs` from the sa
 annotations that validate the requests, which covers exploration without a line of
 frontend code.
 
+**Reversed later, deliberately:** once the analytics were richer than a click total, a
+page of numbers made the case the generated documentation could not. It was built as a
+client of the public API rather than as a view the service renders, which is decision 12.
+
 ## 8. Country resolved at the edge, never from an IP address
 
 **Alternative:** reading the client address and resolving it to a country in the

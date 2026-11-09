@@ -55,7 +55,6 @@ it as a known limitation, move on.
 ### Out of scope
 
 - Authentication and per-user link ownership: the brief describes no actors
-- A frontend: the brief asks for a web service, and FastAPI's OpenAPI UI covers exploration
 - Deployment, containers and CI
 
 ## Slices
@@ -107,10 +106,38 @@ it as a known limitation, move on.
 - [x] A page at `/app` reading the public statistics endpoint
 - [x] A seeding script so the page has a populated link to display
 
+### Slice 8 - Being able to see what the service is doing
+
+- [x] A correlation id per request, returned to the caller and carried into every log line
+- [x] One JSON access log line per request: method, path, status and duration
+- [x] `GET /health` as a liveness check that consults nothing
+- [x] Automated resolutions counted apart from real ones
+- [x] `HEAD` answered rather than refused, which the brief's own `curl -I` example assumes
+
+### Slice 9 - A campaign, not just a link
+
+- [x] Optional `campaign` on a link, and `GET /stats/campaign/{campaign}` ranking placements
+- [x] A channel marker on the QR image, so a scan is distinguishable from a tap
+- [x] Tracking parameters carried from the short link to the destination
+- [x] An optional fallback destination, used once a link has expired
+
+### Slice 10 - Something a marketing team could be shown
+
+- [x] A start page: create a short link, or look up a link or a campaign
+- [x] Each placement in a campaign a link to its own report, and the campaign a link back
+- [x] Per-field validation in the page's own wording, and the hints behind an info icon
+- [x] The palette octopusenergy.es publishes, without its logo, wordmark or favicon
+
+### Slice 11 - What a failed resolution looks like
+
+- [x] A page for an expired link, and a page for an unknown code
+- [x] A browser gets the page and a program gets JSON, decided by the `Accept` header
+- [x] `GET /ready`, which does consult the database and answers 503 when it cannot
+
 ## Not built, and why
 
-- **Bulk creation** and **UTM propagation**, both on the brief's list of nice-to-haves:
-  neither changes what the service demonstrates, and each adds surface to defend.
+- **Bulk creation**, on the brief's list of nice-to-haves: it changes nothing about what
+  the service demonstrates and adds surface to defend.
 - **A management token on the statistics**: the right fix for public analytics, but half an
   authorisation model is worse than none. Recorded as a limitation instead.
 - **Accounts, roles and an administrative view**: a different exercise, and the brief asks

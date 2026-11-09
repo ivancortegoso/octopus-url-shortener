@@ -65,7 +65,7 @@ Configuration is read from the environment, all of it optional:
 | `GET` | `/stats/{code}` | Reports the destination and the click analytics. 404 if unknown |
 | `GET` | `/stats/campaign/{campaign}` | Ranks every placement carrying one campaign. 404 if no link does |
 | `GET` | `/qr/{code}` | Renders the short link as a PNG QR code. 404 if unknown |
-| `GET` | `/app` | The analytics page |
+| `GET` | `/app` | The start page: create a short link, or look one up |
 | `GET` | `/health` | Reports that the process is alive. Consults nothing, by design |
 | `GET` | `/ready` | Reports whether this instance can serve traffic. 503 when the database is unreachable |
 
@@ -100,31 +100,39 @@ curl localhost:8000/stats/campaign/black-friday-go
 #     {"code": "bf-email", "label": "Newsletter", "total_clicks": 84},
 #     {"code": "bf-poster", "label": "Dealership poster", "total_clicks": 77}
 #   ],
-#   "clicks_by_channel": {"link": 318, "qr": 77}
+#   "clicks_by_channel": {"link": 318, "qr": 77},
+#   "clicks_by_country": {"ES": 214, "GB": 71, ...},
+#   "clicks_by_device": {"mobile": 268, "desktop": 127}
 # }
 
-# Follow it
-curl -I localhost:8000/black-friday
+# Follow one of its placements
+curl -I localhost:8000/bf-sms
 # HTTP/1.1 302 Found
 # location: https://example.com/offers
 
-# Read the statistics
-curl localhost:8000/stats/black-friday
+# Read that placement on its own
+curl localhost:8000/stats/bf-sms
 # {
-#   "code": "black-friday",
+#   "code": "bf-sms",
 #   "url": "https://example.com/offers",
-#   "total_clicks": 268,
+#   "label": "Text message to customers",
+#   "campaign": "black-friday-go",
+#   "expires_at": "2026-12-01T00:00:00Z",
+#   "is_expired": false,
+#   "fallback_url": "https://example.com/tariffs",
+#   "total_clicks": 125,
 #   "first_clicked_at": "2026-10-27T06:08:04Z",
 #   "last_clicked_at": "2026-11-09T22:52:36Z",
-#   "average_clicks_per_day": 19.14,
-#   "clicks_by_hour": {"18": 31, "19": 34, "20": 27, ...},
-#   "clicks_by_weekday": {"Mon": 44, "Tue": 29, ...},
-#   "clicks_by_country": {"ES": 141, "GB": 47, ...},
-#   "clicks_by_device": {"mobile": 169, "desktop": 88},
-#   "clicks_by_channel": {"link": 134, "qr": 35},
-#   "bot_clicks": 14,
+#   "average_clicks_per_day": 8.93,
+#   "clicks_per_day": {"2026-10-27": 38, "2026-10-28": 21, ...},
+#   "clicks_by_hour": {"18": 14, "19": 17, "20": 11, ...},
+#   "clicks_by_weekday": {"Mon": 21, "Tue": 13, ...},
+#   "clicks_by_country": {"ES": 68, "GB": 22, ...},
+#   "clicks_by_device": {"mobile": 91, "desktop": 34},
+#   "clicks_by_channel": {"link": 125},
+#   "bot_clicks": 11,
 #   "expired_clicks": 0,
-#   "top_referrers": {"https://www.instagram.com/": 100, ...}
+#   "top_referrers": {"https://www.instagram.com/": 40, ...}
 # }
 
 # Fetch the QR code. The image encodes the link with a channel marker, so a scan is
@@ -161,7 +169,7 @@ uv run ruff check .
 uv run mypy app tests scripts
 ```
 
-87 tests. They drive the application through FastAPI's test client against the in-memory
+94 tests. They drive the application through FastAPI's test client against the in-memory
 storage, so the real routes, validation and status codes are exercised without touching a
 database file.
 
@@ -232,6 +240,13 @@ visitors. That is the intended trade, not an omission.
   falls back to Helvetica, which is what happens here.
 - **The page is a client, not a view.** It reads the same public endpoints anyone else
   would, with no build step and no frontend dependencies, so it cannot drift from the API.
+- **The form answers its own mistakes.** A browser's native validation bubble is styled by
+  the browser, says what the browser decides and vanishes on the next click. The page
+  reports each problem beside the field it belongs to, in that field's own wording. The
+  server repeats every check regardless: the form is a convenience, not the boundary.
+- **The explanations sit behind an icon.** Each field's note is one hover or keyboard focus
+  away rather than printed under every input, so the form stays short enough to take in at
+  a glance without leaving anything unexplained.
 - **Automated traffic is counted apart, not discarded.** A figure that mixes link checkers
   and chat previews into "clicks" misleads whoever placed the link, and one that silently
   drops them hides that a link is being fetched at all. Both are reported.
@@ -292,12 +307,8 @@ a marketing team actually asks point the way:
 
 [QUESTIONS.md](QUESTIONS.md) records the twelve decisions that depend on the business
 rather than on the code, each with what it changes and the assumption taken meanwhile. The
-one that most affects what this service is allowed to be:
-
-## An open question for the business
-
-Should the service accept any destination, or only an allowlist of the company's own
-domains?
+one that most affects what this service is allowed to be: should it accept any destination,
+or only an allowlist of the company's own domains?
 
 A public shortener has to take any valid URL, which is what the brief asks for and what
 this service does. An internal one should not: a shortener that accepts anything lets
