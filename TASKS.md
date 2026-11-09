@@ -84,3 +84,34 @@ it as a known limitation, move on.
 - [x] Optional `code` in the request, validated for shape
 - [x] 409 for a code already taken or reserved by the service
 - [x] Tests for the happy path and each refusal
+
+### Slice 5 - Close what a review of the attack surface found
+
+- [x] Refuse destinations inside private, loopback and link-local ranges
+- [x] Refuse destinations pointing back at the service
+- [x] Rate limit link creation per client, keyed by a salted hash
+- [x] Answer 503 rather than 500 when no code can be allocated
+- [x] Make serving the generated documentation a configuration choice
+
+### Slice 6 - Expiry and the analytics a campaign needs
+
+- [x] Optional `expires_at`, refused when already past, 410 once reached
+- [x] Country from the network edge as a two-letter code, validated not trusted
+- [x] Device category in place of the raw user agent
+- [x] First click, daily average, and distributions by hour, weekday, country and device
+- [x] Weekday and average derived in the domain so the storage implementations agree
+
+### Slice 7 - Something to show
+
+- [x] `GET /qr/{code}` rendering the short link as a PNG
+- [x] A page at `/app` reading the public statistics endpoint
+- [x] A seeding script so the page has a populated link to display
+
+## Not built, and why
+
+- **Bulk creation** and **UTM propagation**, both on the brief's list of nice-to-haves:
+  neither changes what the service demonstrates, and each adds surface to defend.
+- **A management token on the statistics**: the right fix for public analytics, but half an
+  authorisation model is worse than none. Recorded as a limitation instead.
+- **Accounts, roles and an administrative view**: a different exercise, and the brief asks
+  for an MVP. Sketched in the README under where this would go next.
