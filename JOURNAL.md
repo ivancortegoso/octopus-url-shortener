@@ -24,6 +24,9 @@ afterwards.
 | 23:14 | Added campaigns, the channel marker on QR codes, fallback destinations and tracking-parameter forwarding |
 | 23:16 | Decided against counting unique visitors: a hashed IPv4 address is reversible by exhaustion, so it would have made the privacy claim false |
 | 23:20 | Left the destination allowlist out as an open question for the business, since it depends on who may create links |
+| 23:25 | Dressed the page in the palette octopusenergy.es publishes, without its logo, wordmark or favicon |
+| 23:30 | Made each placement in a campaign a link to its own report, and the campaign pill a link back |
+| 23:32 | Found stored XSS in the page while doing that: the campaign name went into innerHTML, and the name is chosen by whoever creates the link. Rebuilt the line from DOM nodes and confirmed with an injected campaign that nothing executes |
 
 ## Known limitations
 

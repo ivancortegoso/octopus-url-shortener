@@ -103,6 +103,9 @@
   td:last-child, th:last-child { text-align: right; }
   tr:last-child td { border-bottom: 0; }
   td .sub { display: block; color: var(--muted); font-size: 0.78rem; }
+  a.tag { text-decoration: none; }
+  a.tag:hover { filter: brightness(1.2); text-decoration: underline; }
+  a.tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   td a { color: var(--accent); text-decoration: none; }
   td a:hover { text-decoration: underline; }
   td a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
@@ -305,21 +308,56 @@
   const asRows = (counts) =>
     Object.entries(counts).map(([name, hits]) => ({ name, hits }));
 
+  /** A pill, optionally one that navigates. */
+  function tag(text, { href, tone } = {}) {
+    const element = document.createElement(href ? "a" : "span");
+    element.className = "tag";
+    if (tone) element.dataset.tone = tone;
+    if (href) element.href = href;
+    element.textContent = text;
+    return element;
+  }
+
+  /**
+   * Write the line under the destination: when it was created, which campaign it belongs
+   * to, and what happens once it expires.
+   *
+   * Built from DOM nodes rather than a string of HTML. The campaign name and the fallback
+   * URL are chosen by whoever created the link, so interpolating them into innerHTML would
+   * let one link run script in the browser of anyone who opened its report.
+   */
+  function renderLifetime(stats) {
+    const parts = [document.createTextNode(`Created ${formatMoment(stats.created_at)}`)];
+
+    if (stats.campaign) {
+      parts.push(
+        document.createTextNode(" · Campaign "),
+        tag(stats.campaign, { href: `/app?campaign=${encodeURIComponent(stats.campaign)}` }),
+      );
+    }
+
+    if (stats.is_expired) {
+      parts.push(document.createTextNode(" · "), tag("Expired", { tone: "expired" }));
+      if (stats.fallback_url) {
+        parts.push(document.createTextNode(` · falling back to ${stats.fallback_url}`));
+      }
+    } else if (stats.expires_at) {
+      parts.push(
+        document.createTextNode(" · "),
+        tag(`Expires ${formatMoment(stats.expires_at)}`),
+      );
+    }
+
+    document.getElementById("lifetime").replaceChildren(...parts);
+  }
+
   function renderLink(stats) {
     document.getElementById("label").textContent = stats.label || stats.code;
     const url = document.getElementById("url");
     url.textContent = stats.url;
     url.href = stats.url;
 
-    const parts = [`Created ${formatMoment(stats.created_at)}`];
-    if (stats.campaign) parts.push(`Campaign <span class="tag">${stats.campaign}</span>`);
-    if (stats.is_expired) {
-      parts.push('<span class="tag" data-tone="expired">Expired</span>');
-      if (stats.fallback_url) parts.push(`falling back to ${stats.fallback_url}`);
-    } else if (stats.expires_at) {
-      parts.push(`<span class="tag">Expires ${formatMoment(stats.expires_at)}</span>`);
-    }
-    document.getElementById("lifetime").innerHTML = parts.join(" · ");
+    renderLifetime(stats);
 
     const qrPath = `/qr/${encodeURIComponent(stats.code)}`;
     document.getElementById("qr").src = qrPath;

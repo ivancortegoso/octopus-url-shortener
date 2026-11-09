@@ -185,3 +185,18 @@ Helvetica when it is unavailable, which is exactly what happens here.
 The line is deliberate. A tool wearing someone's mark reads as their property, and a
 screenshot of it would travel as if it were. Matching the palette shows the work was done
 with the reader in mind; copying the mark would claim something that is not mine to claim.
+
+## 19. The page builds its own markup from nodes, not from strings
+
+**Alternative:** assembling the line under the destination with `innerHTML`, which is how
+it was written first.
+
+**Why:** the campaign name and the fallback URL are chosen by whoever creates a link, and
+the first version interpolated them straight into `innerHTML`. A link created with a
+campaign of `<img src=x onerror=...>` would then have run script in the browser of anyone
+who opened its report — a stored cross-site scripting hole, in the tool rather than the
+API. Building the line from DOM nodes with `textContent` cannot inject, whatever the value
+holds, and it is also what made the campaign pill a working link rather than a styled span.
+
+The API was never the problem: it returns JSON, and JSON carries no markup. The hole was
+in how the page chose to render it, which is where this class of bug usually lives.
