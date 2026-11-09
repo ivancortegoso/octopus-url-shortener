@@ -237,3 +237,20 @@ The two failure pages carry the header as well, so someone who lands on one can 
 tool rather than reaching a dead end. That is right while the service has no accounts;
 once a link belongs to someone, a page shown to the public should not advertise the tool
 that created it.
+
+## 22. Liveness and readiness are separate, and neither reports timings
+
+**Alternative:** one health endpoint that checks the database and reports response times.
+
+**Why:** they answer different questions and a single endpoint cannot serve both. A liveness
+check decides whether to restart the process, so it must not depend on anything downstream:
+consult the database there and a blip in it reads as a dead application, answered by a
+restart that mends nothing — and across several replicas, one blip becomes a restart storm.
+`/health` therefore reports only that the process is answering. `/ready` does consult the
+database, because a failing readiness check takes the instance out of rotation without
+killing it, which is the correct response to a dependency that has stopped answering.
+
+Timings belong in neither. An average held by the application is a figure it has to keep
+state for, describes one instant, and is measured better from outside. Each request already
+records its own duration in the access log, and a `/metrics` endpoint for scraping is the
+next step rather than a fatter health check.

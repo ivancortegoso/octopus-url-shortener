@@ -115,6 +115,8 @@ class Storage(Protocol):
 
     def get_campaign_statistics(self, campaign: str) -> CampaignStatistics | None: ...
 
+    def check_reachable(self) -> None: ...
+
 
 class SqliteStorage:
     """Stores links and clicks in a SQLite file."""
@@ -144,6 +146,15 @@ class SqliteStorage:
             connection.commit()
         finally:
             connection.close()
+
+    def check_reachable(self) -> None:
+        """Raise if the database cannot be opened and queried.
+
+        A trivial statement rather than a count: the question is whether the file is there
+        and answering, not how much is in it.
+        """
+        with self._connect() as connection:
+            connection.execute("SELECT 1").fetchone()
 
     def add_link(self, link: Link) -> None:
         with self._connect() as connection:
@@ -338,6 +349,9 @@ class InMemoryStorage:
 
     links: dict[str, Link] = field(default_factory=dict)
     clicks: list[Click] = field(default_factory=list)
+
+    def check_reachable(self) -> None:
+        """Always reachable: the data is in this process."""
 
     def add_link(self, link: Link) -> None:
         if link.code in self.links:

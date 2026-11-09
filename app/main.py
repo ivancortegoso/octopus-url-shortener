@@ -98,10 +98,40 @@ async def validation_error_handler(_: Request, error: RequestValidationError) ->
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": details})
 
 
-@app.get("/health", summary="Report that the service is running")
+@app.get("/health", summary="Report that the process is alive")
 def health() -> dict[str, str]:
-    """Answer the liveness check a platform uses to decide whether to restart."""
+    """Answer the liveness check, and deliberately nothing more.
+
+    A liveness check decides whether to restart the process, so it must not depend on
+    anything downstream. Were the database consulted here, a blip in it would be read as a
+    dead application and answered by restarting — which does not mend a database, and with
+    several replicas turns one blip into a restart storm. Whether this instance can serve
+    traffic is a different question, answered by /ready.
+    """
     return {"status": "ok"}
+
+
+@app.get(
+    "/ready",
+    summary="Report whether this instance can serve traffic",
+    responses={503: {"description": "A dependency is unreachable."}},
+)
+def readiness(storage: StorageDep) -> JSONResponse:
+    """Answer the readiness check, which does consult the database.
+
+    A failing readiness check takes the instance out of rotation without killing it, so the
+    load balancer stops sending it work until its dependencies answer again.
+    """
+    try:
+        storage.check_reachable()
+    # Whatever a driver raises for an unreachable store, the answer to the caller is the
+    # same, and a readiness check that itself raises is worse than useless.
+    except Exception:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unavailable", "database": "unreachable"},
+        )
+    return JSONResponse(content={"status": "ready", "database": "reachable"})
 
 
 @app.get("/app", response_class=FileResponse, include_in_schema=False)

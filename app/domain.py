@@ -11,7 +11,7 @@ CODE_ALPHABET = string.ascii_letters + string.digits
 # Paths the application serves itself. A generated code that matched one of these would
 # produce a link that can never resolve, so they are excluded.
 RESERVED_CODES = frozenset(
-    {"docs", "redoc", "openapi.json", "stats", "shorten", "qr", "app", "health"}
+    {"docs", "redoc", "openapi.json", "stats", "shorten", "qr", "app", "health", "ready"}
 )
 
 # User agents name themselves, and they imitate each other, so these are indicative.

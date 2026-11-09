@@ -31,7 +31,8 @@ The service listens on `http://localhost:8000`.
 - `http://localhost:8000/docs` — interactive API documentation, generated from the code
 - `http://localhost:8000/app` — create a short link, or look one up
 - `http://localhost:8000/app?view=search` — the lookup on its own
-- `http://localhost:8000/health` — the liveness check
+- `http://localhost:8000/health` — is the process alive
+- `http://localhost:8000/ready` — can it serve traffic
 
 To see the page with something in it, seed a demonstration campaign first:
 
@@ -65,7 +66,8 @@ Configuration is read from the environment, all of it optional:
 | `GET` | `/stats/campaign/{campaign}` | Ranks every placement carrying one campaign. 404 if no link does |
 | `GET` | `/qr/{code}` | Renders the short link as a PNG QR code. 404 if unknown |
 | `GET` | `/app` | The analytics page |
-| `GET` | `/health` | Reports that the service is running |
+| `GET` | `/health` | Reports that the process is alive. Consults nothing, by design |
+| `GET` | `/ready` | Reports whether this instance can serve traffic. 503 when the database is unreachable |
 
 ## Example usage
 
@@ -214,6 +216,11 @@ visitors. That is the intended trade, not an omission.
 - **A connection per operation.** FastAPI runs synchronous endpoints in a thread pool,
   where sharing one SQLite connection is unsafe. Opening per call is cheap and correct;
   WAL mode keeps readers from blocking the writer.
+- **Liveness and readiness are separate.** `/health` says only that the process answers,
+  because a liveness check decides whether to restart it and a database blip must not be
+  answered by a restart. `/ready` does consult the database, so a failing dependency takes
+  the instance out of rotation instead of killing it. Timings are in the access log, where
+  each request records its own duration, rather than averaged inside a health check.
 - **A failed resolution answers a page or a payload.** The redirect is the only route a
   person lands on directly, so a browser following an expired link gets a page that says so
   rather than raw JSON. Browsers name `text/html` in what they accept and programs do not,
