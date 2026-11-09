@@ -128,7 +128,13 @@
   /* Charts. The value rides on the bar as a tooltip rather than a title attribute, which
      the browser only reveals after a pause and renders in its own style. */
   .bars { display: flex; align-items: flex-end; gap: 3px; height: 118px; }
-  .bars .column { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bars .column {
+    flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%;
+    position: relative;
+  }
+  /* Bars are siblings, so a later one paints over an earlier one's label. Lifting the
+     column being read puts its label above every bar, whichever side it sits on. */
+  .bars .column:hover, .bars .column:focus-visible { z-index: 2; }
   .bars i { display: block; position: relative; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
   .bars i::after {
     content: attr(data-value);
@@ -138,7 +144,11 @@
     font-size: 0.74rem; font-weight: 500; font-style: normal; white-space: nowrap;
     opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
   }
-  .bars .column:hover i::after, .bars .column:focus-within i::after { opacity: 1; }
+  /* focus-visible rather than focus-within: a mouse click would otherwise pin a label
+     open, leaving two on screen at once. */
+  .bars .column:hover i::after, .bars .column:focus-visible i::after { opacity: 1; }
+  /* While the chart is being pointed at, only the bar under the cursor speaks. */
+  .bars:hover .column:not(:hover) i::after { opacity: 0; }
   .bars .column:hover i { filter: brightness(1.2); }
   .bars span { margin-top: 6px; font-size: 0.62rem; color: var(--muted); text-align: center; }
 
