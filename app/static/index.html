@@ -245,10 +245,16 @@
           <input id="f-campaign" name="campaign" maxlength="100" placeholder="black-friday-go">
           <span class="hint">Give the same campaign to every link of one promotion to compare them.</span>
         </div>
-        <div class="field field--wide">
+        <div class="field">
           <label for="f-expires">Stop working on</label>
           <input id="f-expires" name="expires_at" type="datetime-local">
-          <span class="hint">After this moment anyone opening the link sees a page saying it has expired. Leave it empty and the link never stops working.</span>
+          <span class="hint">Leave it empty and the link never stops working.</span>
+        </div>
+        <div class="field">
+          <label for="f-fallback">Send people here afterwards</label>
+          <input id="f-fallback" name="fallback_url" type="url"
+                 placeholder="https://example.com/tariffs">
+          <span class="hint">Once the link has stopped working, anyone opening it goes here instead. Leave it empty and they see a page saying the link has expired.</span>
         </div>
       </div>
       <div class="actions">
@@ -484,6 +490,9 @@
         document.createTextNode(" · "),
         tag(`Expires ${formatMoment(stats.expires_at)}`),
       );
+      if (stats.fallback_url) {
+        parts.push(document.createTextNode(` · then sends people to ${stats.fallback_url}`));
+      }
     }
 
     document.getElementById("lifetime").replaceChildren(...parts);
@@ -574,12 +583,27 @@
     }
   }
 
+  // Field names as the API knows them, said the way the form says them.
+  const FIELD_NAMES = {
+    url: "Where the link should lead",
+    label: "Name",
+    code: "Ending",
+    campaign: "Campaign",
+    expires_at: "Stop working on",
+    fallback_url: "Send people here afterwards",
+  };
+
   /** Turn whatever the API put in `detail` into one line a person can act on. */
   function describeFailure(status, detail) {
     if (Array.isArray(detail)) {
       return detail
-        .map((item) => (item.field ? `${item.field}: ${item.message}` : item.message))
-        .join("; ");
+        .map((item) => {
+          // Validation messages arrive prefixed by the library that raised them.
+          const text = String(item.message || "").replace(/^value error,\s*/i, "");
+          const name = FIELD_NAMES[item.field];
+          return name ? `${name}: ${text}` : text;
+        })
+        .join(". ");
     }
     if (typeof detail === "string" && detail) return detail;
     return `The API answered with HTTP ${status}.`;
@@ -608,6 +632,9 @@
     "f-code": {
       patternMismatch:
         "Use 3 to 32 characters: letters, numbers, hyphens or underscores, with no spaces.",
+    },
+    "f-fallback": {
+      typeMismatch: "Enter a full web address, starting with http:// or https://",
     },
   };
 
