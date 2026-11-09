@@ -9,7 +9,7 @@ CODE_ALPHABET = string.ascii_letters + string.digits
 
 # Paths the application serves itself. A generated code that matched one of these would
 # produce a link that can never resolve, so they are excluded from the alphabet soup.
-RESERVED_CODES = frozenset({"docs", "redoc", "openapi.json", "stats", "shorten", "health"})
+RESERVED_CODES = frozenset({"docs", "redoc", "openapi.json", "stats", "shorten"})
 
 
 @dataclass(frozen=True, slots=True)

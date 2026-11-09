@@ -2,14 +2,14 @@
 
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import Settings, get_settings
 from app.dependencies import get_storage
-from app.domain import Link, generate_code, utc_now
-from app.schemas import ShortenRequest, ShortenResponse
+from app.domain import Click, Link, generate_code, utc_now
+from app.schemas import ShortenRequest, ShortenResponse, StatsResponse
 from app.storage import CodeAlreadyExistsError, Storage
 
 # A generated code can collide with one already stored. Retrying a bounded number of
@@ -66,3 +66,52 @@ def _store_with_unique_code(
             continue
         return link
     raise RuntimeError("Could not generate an unused short code.")
+
+
+@app.get(
+    "/stats/{code}",
+    response_model=StatsResponse,
+    summary="Report what is known about a short code",
+)
+def statistics(code: str, storage: StorageDep) -> StatsResponse:
+    """Return the original URL and the click analytics recorded for it."""
+    stats = storage.get_statistics(code)
+    if stats is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
+
+    return StatsResponse(
+        code=stats.link.code,
+        url=stats.link.url,
+        label=stats.link.label,
+        created_at=stats.link.created_at,
+        total_clicks=stats.total_clicks,
+        last_clicked_at=stats.last_clicked_at,
+        clicks_per_day=stats.clicks_per_day,
+        top_referrers=stats.top_referrers,
+    )
+
+
+# Declared last: this pattern matches any single path segment, so every fixed route the
+# service exposes has to be registered before it.
+@app.get(
+    "/{code}",
+    status_code=status.HTTP_302_FOUND,
+    response_class=RedirectResponse,
+    summary="Resolve a short code",
+)
+def follow(code: str, request: Request, storage: StorageDep) -> RedirectResponse:
+    """Redirect to the original URL and record the click."""
+    link = storage.get_link(code)
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
+
+    storage.add_click(
+        Click(
+            code=code,
+            clicked_at=utc_now(),
+            # The HTTP header has carried the historical misspelling "referer" since 1996.
+            referrer=request.headers.get("referer"),
+            user_agent=request.headers.get("user-agent"),
+        )
+    )
+    return RedirectResponse(url=link.url, status_code=status.HTTP_302_FOUND)
