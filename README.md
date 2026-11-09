@@ -60,7 +60,7 @@ Configuration is read from the environment, all of it optional:
 | Method | Path | Behaviour |
 | --- | --- | --- |
 | `POST` | `/shorten` | Stores a URL. 201 on success, 400 on an invalid or unsafe URL, 409 on a taken or reserved code, 429 past the allowance, 503 if no code could be allocated |
-| `GET`, `HEAD` | `/{code}` | Redirects with 302 and records the click. 404 if unknown; once expired, redirects to the fallback if one was set and answers 410 otherwise |
+| `GET`, `HEAD` | `/{code}` | Redirects with 302 and records the click. 404 if unknown; once expired, redirects to the fallback if one was set and answers 410 otherwise. A browser gets a page explaining what happened, a program gets JSON |
 | `GET` | `/stats/{code}` | Reports the destination and the click analytics. 404 if unknown |
 | `GET` | `/stats/campaign/{campaign}` | Ranks every placement carrying one campaign. 404 if no link does |
 | `GET` | `/qr/{code}` | Renders the short link as a PNG QR code. 404 if unknown |
@@ -214,6 +214,10 @@ visitors. That is the intended trade, not an omission.
 - **A connection per operation.** FastAPI runs synchronous endpoints in a thread pool,
   where sharing one SQLite connection is unsafe. Opening per call is cheap and correct;
   WAL mode keeps readers from blocking the writer.
+- **A failed resolution answers a page or a payload.** The redirect is the only route a
+  person lands on directly, so a browser following an expired link gets a page that says so
+  rather than raw JSON. Browsers name `text/html` in what they accept and programs do not,
+  so the two are told apart without guessing. Every other route answers with a payload.
 - **The page borrows the palette and nothing else.** The colours and the corner radius
   come from the stylesheet octopusenergy.es publishes, so the tool looks at home beside the
   product it serves. No logo, no wordmark, no favicon of theirs: a tool wearing someone's

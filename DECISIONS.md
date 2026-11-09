@@ -200,3 +200,17 @@ holds, and it is also what made the campaign pill a working link rather than a s
 
 The API was never the problem: it returns JSON, and JSON carries no markup. The hole was
 in how the page chose to render it, which is where this class of bug usually lives.
+
+## 20. A failed resolution answers a page or a payload, depending on who asked
+
+**Alternative:** one answer for everyone — JSON, as the rest of the API returns.
+
+**Why:** the redirect is the only route a person lands on directly. Someone who follows an
+expired link from a printed poster gets a raw `{"detail": "This link has expired."}`, which
+tells them nothing and looks broken. A link checker, meanwhile, needs the machine-readable
+answer. Browsers name `text/html` in what they accept and programs send `*/*` or ask for
+JSON, so the two can be told apart without guessing: the status code is the same either
+way, only its clothing differs.
+
+The distinction is deliberately limited to that one route. `/stats` and `/qr` are consumed
+by programs, including this project's own page, and answer with a payload regardless.

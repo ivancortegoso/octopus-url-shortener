@@ -322,6 +322,23 @@ def qr_code(code: str, storage: StorageDep, settings: SettingsDep) -> Response:
 
 # Declared last: this pattern matches any single path segment, so every fixed route the
 # service exposes has to be registered before it.
+def _wants_a_page(request: Request) -> bool:
+    """Report whether the caller is a browser rather than a program.
+
+    Browsers name `text/html` in what they accept; curl, link checkers and API clients send
+    `*/*` or ask for JSON. The distinction matters only where a person can land directly,
+    which is the redirect: everywhere else the answer is a payload either way.
+    """
+    return "text/html" in request.headers.get("accept", "")
+
+
+def _refuse(request: Request, code: int, page: str, detail: str) -> FileResponse:
+    """Answer a failed resolution with a page for people and a payload for programs."""
+    if not _wants_a_page(request):
+        raise HTTPException(status_code=code, detail=detail)
+    return FileResponse(STATIC_DIR / page, status_code=code)
+
+
 @app.api_route(
     "/{code}",
     # HEAD as well as GET: link checkers and the brief's own `curl -I` example ask where a
@@ -331,11 +348,13 @@ def qr_code(code: str, storage: StorageDep, settings: SettingsDep) -> Response:
     response_class=RedirectResponse,
     summary="Resolve a short code",
 )
-def follow(code: str, request: Request, storage: StorageDep) -> RedirectResponse:
+def follow(code: str, request: Request, storage: StorageDep) -> Response:
     """Redirect to the original URL and record the click."""
     link = storage.get_link(code)
     if link is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
+        return _refuse(
+            request, status.HTTP_404_NOT_FOUND, "not-found.html", "Unknown short code."
+        )
 
     now = utc_now()
     expired = link.has_expired(now)
@@ -357,7 +376,9 @@ def follow(code: str, request: Request, storage: StorageDep) -> RedirectResponse
 
     destination = link.destination(now)
     if destination is None:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="This link has expired.")
+        return _refuse(
+            request, status.HTTP_410_GONE, "expired.html", "This link has expired."
+        )
 
     return RedirectResponse(
         url=forward_tracking_parameters(destination, dict(request.query_params)),

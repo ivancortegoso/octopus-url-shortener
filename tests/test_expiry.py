@@ -108,3 +108,28 @@ def test_a_fallback_inside_a_private_network_is_refused(client: TestClient) -> N
     )
 
     assert response.status_code == 400
+
+
+def test_a_browser_sees_a_page_when_a_link_has_expired(
+    client: TestClient, storage: InMemoryStorage
+) -> None:
+    storage.add_link(_expired_link())
+
+    response = client.get(
+        "/expired", follow_redirects=False, headers={"accept": "text/html,*/*;q=0.8"}
+    )
+
+    assert response.status_code == 410
+    assert response.headers["content-type"].startswith("text/html")
+    assert "has expired" in response.text
+
+
+def test_a_program_still_gets_json_when_a_link_has_expired(
+    client: TestClient, storage: InMemoryStorage
+) -> None:
+    storage.add_link(_expired_link())
+
+    response = client.get("/expired", follow_redirects=False, headers={"accept": "*/*"})
+
+    assert response.status_code == 410
+    assert response.json() == {"detail": "This link has expired."}

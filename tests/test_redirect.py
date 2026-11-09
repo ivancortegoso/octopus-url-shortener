@@ -58,3 +58,20 @@ def test_an_unknown_code_records_no_click(client: TestClient, storage: InMemoryS
     client.get("/nothing", follow_redirects=False)
 
     assert storage.clicks == []
+
+
+def test_a_browser_sees_a_page_for_an_unknown_code(client: TestClient) -> None:
+    response = client.get(
+        "/nothing", follow_redirects=False, headers={"accept": "text/html,*/*;q=0.8"}
+    )
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("text/html")
+    assert "does not exist" in response.text
+
+
+def test_a_program_still_gets_json_for_an_unknown_code(client: TestClient) -> None:
+    response = client.get("/nothing", follow_redirects=False, headers={"accept": "*/*"})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Unknown short code."}
