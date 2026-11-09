@@ -67,3 +67,54 @@ from blocking the write.
 deliverables. FastAPI generates interactive documentation at `/docs` from the same type
 annotations that validate the requests, which covers exploration without a line of
 frontend code.
+
+## 8. Country resolved at the edge, never from an IP address
+
+**Alternative:** reading the client address and resolving it to a country in the
+application, either with a bundled GeoIP database or a lookup service.
+
+**Why:** both alternatives mean the application receives and processes an IP address, and
+a lookup service means sending it to a third party on the hot path. Content delivery
+networks already resolve geography before the request arrives and pass it in a header, so
+the application can take a two-letter code and nothing else. A country code on its own
+singles out nobody. The cost is a dependency on the deployment: with no proxy in front,
+the country is simply unknown, which the response represents honestly.
+
+## 9. A device category instead of the user agent
+
+**Alternative:** storing the user agent string, as click analytics usually do.
+
+**Why:** the full string is one of the strongest browser-fingerprinting signals there is,
+and nothing a marketing team asks needs it. Reducing it at the boundary to bot, mobile,
+desktop or unknown answers the real question — how people arrive — and leaves nothing
+behind worth correlating. The classification is a heuristic, which the code says plainly:
+user agents are self-reported and imitate each other.
+
+## 10. 410 for expired links rather than 404
+
+**Alternative:** treating an expired link as if it had never existed.
+
+**Why:** 410 Gone says the resource existed and will not return, which is exactly the
+situation and lets a caller distinguish a typo from a campaign that has finished. The
+statistics stay readable after expiry, because the point of an expiring campaign link is
+to look at how it did once it is over.
+
+## 11. Statistics stay public
+
+**Alternative:** issuing a management token when a link is created and requiring it to read
+the statistics.
+
+**Why:** the brief describes no actors and asks for an MVP. A token would close a real gap
+— readable custom codes are easy to guess, so a competitor could read a campaign's
+numbers — but half of an authorisation model is worse than none, and a full one is a
+different exercise. It is recorded as a known limitation instead, with ownership as the
+next step.
+
+## 12. The page is a client of the API, not a view rendered by it
+
+**Alternative:** server-rendered templates with Jinja2, which FastAPI supports.
+
+**Why:** a page that reads the same public endpoint as any other client cannot drift from
+the API, needs no templating dependency, and demonstrates that the API is usable. It is
+one static file with no build step. The brief asked for a web service; this is there to
+show the analytics to someone who does not read JSON, and nothing depends on it.

@@ -14,17 +14,12 @@ afterwards.
 | 22:05 | Redirect and statistics done. Decided against recording IP addresses: personal data, and the statistics do not need it |
 | 22:06 | Wrote the README usage examples and design notes, and the decision log |
 | 22:07 | Added readable custom codes as the self-chosen feature, refusing taken and reserved codes with 409 |
-| [FILL] | [FILL: entries from the review and verification pass] |
+| 22:10 | Three tests caught the custom-code feature not being wired into the route. Fixed, and the commit that carried it was incomplete, so it was redone |
+| 22:20 | Reviewed the service against how it would be abused and found four issues: open redirects to private addresses, no rate limiting, a 500 on code exhaustion, and documentation always exposed |
+| 22:40 | Hardened all four. Rate-limit clients are keyed by a salted hash rather than their address, so no raw IP is held even in memory |
+| 22:50 | Added expiry, and the analytics a campaign actually needs. Country comes from the edge as a two-letter code and the user agent is reduced to a device category, so no personal data is stored |
+| 23:05 | Added the QR endpoint and a page that reads the public statistics endpoint, plus a seeding script so the page has something to show |
 
 ## Known limitations
 
-- The redirect path reads SQLite on every request. The mapping is immutable once created,
-  so a cache would remove that read entirely; left out because correctness came first and
-  no load justifies it yet.
-- Short codes are random with a bounded retry on collision. At the default length of seven
-  characters collisions are vanishingly rare, but the retry limit means a saturated code
-  space would surface as a 500 rather than a considered error.
-- The statistics queries are unbounded. A link with millions of clicks would group over the
-  whole table on every call; real use needs either pagination or a rollup table.
-- There is no authentication, so anyone who can reach the service can create links and read
-  any link's statistics.
+Carried in the README, which is where a reader will look for them.
