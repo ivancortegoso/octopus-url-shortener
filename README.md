@@ -211,6 +211,11 @@ visitors. That is the intended trade, not an omission.
 - **A connection per operation.** FastAPI runs synchronous endpoints in a thread pool,
   where sharing one SQLite connection is unsafe. Opening per call is cheap and correct;
   WAL mode keeps readers from blocking the writer.
+- **The page borrows the palette and nothing else.** The colours and the corner radius
+  come from the stylesheet octopusenergy.es publishes, so the tool looks at home beside the
+  product it serves. No logo, no wordmark, no favicon of theirs: a tool wearing someone's
+  mark reads as their property. Their typeface is proprietary, and their own stylesheet
+  falls back to Helvetica, which is what happens here.
 - **The page is a client, not a view.** It reads the same public endpoints anyone else
   would, with no build step and no frontend dependencies, so it cannot drift from the API.
 - **Automated traffic is counted apart, not discarded.** A figure that mixes link checkers
@@ -268,6 +273,12 @@ a marketing team actually asks point the way:
 5. **Caching the redirect**, the one change that most affects how this behaves under load.
 6. **Sentry for errors and a `/metrics` endpoint**, which is where the correlation ids and
    structured logs already point.
+
+## Open questions
+
+[QUESTIONS.md](QUESTIONS.md) records the twelve decisions that depend on the business
+rather than on the code, each with what it changes and the assumption taken meanwhile. The
+one that most affects what this service is allowed to be:
 
 ## An open question for the business
 

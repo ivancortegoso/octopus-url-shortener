@@ -170,3 +170,18 @@ with one indexed column and no second table to create, join or migrate. The mome
 campaign needs properties of its own, a budget or an owner or a date range, it becomes an
 entity and this becomes a foreign key. Reaching for the table first would be building for a
 requirement nobody has stated.
+
+## 18. The page borrows the palette, and nothing else
+
+**Alternative:** a neutral theme, or a full imitation including the logo and the favicon.
+
+**Why:** the colours octopusenergy.es publishes in its own stylesheet are read off the site
+and used here, so the tool sits comfortably beside the product it would serve, and the
+twelve-pixel corner radius comes from the same place. What is not borrowed is the mark: no
+logo, no wordmark, no favicon of theirs, and the icon in the tab is drawn for this project.
+Their typeface, Chromatophore, is proprietary, and their own stylesheet falls back to
+Helvetica when it is unavailable, which is exactly what happens here.
+
+The line is deliberate. A tool wearing someone's mark reads as their property, and a
+screenshot of it would travel as if it were. Matching the palette shows the work was done
+with the reader in mind; copying the mark would claim something that is not mine to claim.
