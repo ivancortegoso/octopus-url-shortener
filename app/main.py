@@ -14,18 +14,30 @@ from app.config import Settings, get_settings
 from app.dependencies import get_rate_limiter, get_storage
 from app.destinations import UnsafeDestinationError, ensure_safe_destination
 from app.domain import (
+    CHANNEL_PARAMETER,
+    CHANNEL_QR,
     Click,
     Link,
     average_clicks_per_day,
+    channel_from,
     classify_device,
+    forward_tracking_parameters,
     generate_code,
+    is_automated,
     is_reserved,
     normalise_country,
     utc_now,
     weekday_distribution,
 )
+from app.observability import configure_logging, log_request
 from app.rate_limiting import SlidingWindowRateLimiter, client_key
-from app.schemas import ShortenRequest, ShortenResponse, StatsResponse
+from app.schemas import (
+    CampaignLink,
+    CampaignStatsResponse,
+    ShortenRequest,
+    ShortenResponse,
+    StatsResponse,
+)
 from app.storage import CodeAlreadyExistsError, Storage
 
 # A generated code can collide with one already stored. Retrying a bounded number of
@@ -40,6 +52,7 @@ QR_SCALE = 6
 STATIC_DIR = Path(__file__).parent / "static"
 
 _settings = get_settings()
+configure_logging()
 
 app = FastAPI(
     title="URL shortener",
@@ -49,6 +62,8 @@ app = FastAPI(
     redoc_url="/redoc" if _settings.docs_enabled else None,
     openapi_url="/openapi.json" if _settings.docs_enabled else None,
 )
+
+app.middleware("http")(log_request)
 
 StorageDep = Annotated[Storage, Depends(get_storage)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -83,6 +98,12 @@ async def validation_error_handler(_: Request, error: RequestValidationError) ->
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": details})
 
 
+@app.get("/health", summary="Report that the service is running")
+def health() -> dict[str, str]:
+    """Answer the liveness check a platform uses to decide whether to restart."""
+    return {"status": "ok"}
+
+
 @app.get("/app", response_class=FileResponse, include_in_schema=False)
 def dashboard() -> FileResponse:
     """Serve the single page that reads the public statistics API."""
@@ -99,10 +120,16 @@ def dashboard() -> FileResponse:
 def shorten(payload: ShortenRequest, storage: StorageDep, settings: SettingsDep) -> ShortenResponse:
     """Store a URL and return the code that resolves to it."""
     url = str(payload.url)
-    try:
-        ensure_safe_destination(url, settings.base_url)
-    except UnsafeDestinationError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    fallback_url = str(payload.fallback_url) if payload.fallback_url else None
+    for candidate in (url, fallback_url):
+        if candidate is None:
+            continue
+        try:
+            ensure_safe_destination(candidate, settings.base_url)
+        except UnsafeDestinationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
+            ) from error
 
     if payload.code is not None:
         link = _store_with_requested_code(
@@ -111,6 +138,8 @@ def shorten(payload: ShortenRequest, storage: StorageDep, settings: SettingsDep)
             label=payload.label,
             code=payload.code,
             expires_at=payload.expires_at,
+            fallback_url=fallback_url,
+            campaign=payload.campaign,
         )
     else:
         link = _store_with_unique_code(
@@ -119,12 +148,16 @@ def shorten(payload: ShortenRequest, storage: StorageDep, settings: SettingsDep)
             label=payload.label,
             code_length=settings.code_length,
             expires_at=payload.expires_at,
+            fallback_url=fallback_url,
+            campaign=payload.campaign,
         )
 
     return ShortenResponse(
         code=link.code,
         short_url=f"{settings.base_url}/{link.code}",
         expires_at=link.expires_at,
+        fallback_url=link.fallback_url,
+        campaign=link.campaign,
     )
 
 
@@ -135,6 +168,8 @@ def _store_with_requested_code(
     label: str | None,
     code: str,
     expires_at: datetime | None,
+    fallback_url: str | None,
+    campaign: str | None,
 ) -> Link:
     """Store a link under a caller-chosen code, refusing one that is taken or reserved."""
     if is_reserved(code):
@@ -149,6 +184,8 @@ def _store_with_requested_code(
         label=label,
         created_at=utc_now(),
         expires_at=expires_at,
+        fallback_url=fallback_url,
+        campaign=campaign,
     )
     try:
         storage.add_link(link)
@@ -167,6 +204,8 @@ def _store_with_unique_code(
     label: str | None,
     code_length: int,
     expires_at: datetime | None,
+    fallback_url: str | None,
+    campaign: str | None,
 ) -> Link:
     """Store a link under a generated code, retrying a bounded number of collisions."""
     for _ in range(MAX_CODE_ATTEMPTS):
@@ -176,6 +215,8 @@ def _store_with_unique_code(
             label=label,
             created_at=utc_now(),
             expires_at=expires_at,
+            fallback_url=fallback_url,
+            campaign=campaign,
         )
         try:
             storage.add_link(link)
@@ -207,10 +248,14 @@ def statistics(code: str, storage: StorageDep) -> StatsResponse:
         code=stats.link.code,
         url=stats.link.url,
         label=stats.link.label,
+        campaign=stats.link.campaign,
         created_at=stats.link.created_at,
         expires_at=stats.link.expires_at,
         is_expired=stats.link.has_expired(now),
+        fallback_url=stats.link.fallback_url,
         total_clicks=stats.total_clicks,
+        bot_clicks=stats.bot_clicks,
+        expired_clicks=stats.expired_clicks,
         first_clicked_at=stats.first_clicked_at,
         last_clicked_at=stats.last_clicked_at,
         average_clicks_per_day=average_clicks_per_day(
@@ -221,7 +266,40 @@ def statistics(code: str, storage: StorageDep) -> StatsResponse:
         clicks_by_weekday=weekday_distribution(stats.clicks_per_day),
         clicks_by_country=stats.clicks_by_country,
         clicks_by_device=stats.clicks_by_device,
+        clicks_by_channel=stats.clicks_by_channel,
         top_referrers=stats.top_referrers,
+    )
+
+
+@app.get(
+    "/stats/campaign/{campaign}",
+    response_model=CampaignStatsResponse,
+    summary="Report every link placed for one campaign",
+)
+def campaign_statistics(campaign: str, storage: StorageDep) -> CampaignStatsResponse:
+    """Return the campaign's links ranked by the traffic each one brought."""
+    stats = storage.get_campaign_statistics(campaign)
+    if stats is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No links carry that campaign."
+        )
+
+    return CampaignStatsResponse(
+        campaign=stats.campaign,
+        total_clicks=stats.total_clicks,
+        bot_clicks=stats.bot_clicks,
+        links=[
+            CampaignLink(
+                code=summary.code,
+                url=summary.url,
+                label=summary.label,
+                total_clicks=summary.total_clicks,
+            )
+            for summary in stats.links
+        ],
+        clicks_by_channel=stats.clicks_by_channel,
+        clicks_by_country=stats.clicks_by_country,
+        clicks_by_device=stats.clicks_by_device,
     )
 
 
@@ -232,7 +310,9 @@ def qr_code(code: str, storage: StorageDep, settings: SettingsDep) -> Response:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
 
     image = io.BytesIO()
-    segno.make(f"{settings.base_url}/{code}", error="m").save(image, kind="png", scale=QR_SCALE)
+    # The encoded link carries the channel, so a scan is distinguishable from a tap.
+    target = f"{settings.base_url}/{code}?{CHANNEL_PARAMETER}={CHANNEL_QR}"
+    segno.make(target, error="m").save(image, kind="png", scale=QR_SCALE)
     return Response(
         content=image.getvalue(),
         media_type="image/png",
@@ -242,8 +322,11 @@ def qr_code(code: str, storage: StorageDep, settings: SettingsDep) -> Response:
 
 # Declared last: this pattern matches any single path segment, so every fixed route the
 # service exposes has to be registered before it.
-@app.get(
+@app.api_route(
     "/{code}",
+    # HEAD as well as GET: link checkers and the brief's own `curl -I` example ask where a
+    # code leads without opening it, and answering 405 to them would be wrong.
+    methods=["GET", "HEAD"],
     status_code=status.HTTP_302_FOUND,
     response_class=RedirectResponse,
     summary="Resolve a short code",
@@ -255,10 +338,8 @@ def follow(code: str, request: Request, storage: StorageDep) -> RedirectResponse
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
 
     now = utc_now()
-    if link.has_expired(now):
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE, detail="This link has expired."
-        )
+    expired = link.has_expired(now)
+    device = classify_device(request.headers.get("user-agent"))
 
     storage.add_click(
         Click(
@@ -267,10 +348,21 @@ def follow(code: str, request: Request, storage: StorageDep) -> RedirectResponse
             # The HTTP header has carried the historical misspelling "referer" since 1996.
             referrer=request.headers.get("referer"),
             country=_country_from_edge(request),
-            device=classify_device(request.headers.get("user-agent")),
+            device=device,
+            channel=channel_from(request.query_params.get(CHANNEL_PARAMETER)),
+            is_bot=is_automated(request.method, device),
+            after_expiry=expired,
         )
     )
-    return RedirectResponse(url=link.url, status_code=status.HTTP_302_FOUND)
+
+    destination = link.destination(now)
+    if destination is None:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="This link has expired.")
+
+    return RedirectResponse(
+        url=forward_tracking_parameters(destination, dict(request.query_params)),
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
 def _country_from_edge(request: Request) -> str | None:

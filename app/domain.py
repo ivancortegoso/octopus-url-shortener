@@ -4,18 +4,49 @@ import secrets
 import string
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 CODE_ALPHABET = string.ascii_letters + string.digits
 
 # Paths the application serves itself. A generated code that matched one of these would
 # produce a link that can never resolve, so they are excluded.
-RESERVED_CODES = frozenset({"docs", "redoc", "openapi.json", "stats", "shorten", "qr", "app"})
+RESERVED_CODES = frozenset(
+    {"docs", "redoc", "openapi.json", "stats", "shorten", "qr", "app", "health"}
+)
 
 # User agents name themselves, and they imitate each other, so these are indicative.
-BOT_TOKENS = ("bot", "crawler", "spider", "curl", "wget", "python-requests", "httpx")
+# The chat clients matter in practice: pasting a short link into a conversation makes the
+# platform fetch it to build a preview, and that fetch is not a person.
+BOT_TOKENS = (
+    "bot",
+    "crawler",
+    "spider",
+    "curl",
+    "wget",
+    "python-requests",
+    "httpx",
+    "slackbot",
+    "whatsapp",
+    "facebookexternalhit",
+    "telegrambot",
+    "discordbot",
+    "linkedinbot",
+    "embedly",
+    "preview",
+)
 MOBILE_TOKENS = ("android", "iphone", "ipad", "ipod", "mobile", "windows phone")
 
 WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+# How a visitor reached the link. A scanned code and a tapped link answer different
+# questions for whoever placed them.
+CHANNEL_LINK = "link"
+CHANNEL_QR = "qr"
+CHANNEL_PARAMETER = "ch"
+
+# Campaign parameters a caller may put on the short link; they are carried through to the
+# destination so the analytics on the far side agree with ours.
+TRACKING_PREFIX = "utm_"
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,9 +58,22 @@ class Link:
     label: str | None
     created_at: datetime
     expires_at: datetime | None = None
+    fallback_url: str | None = None
+    campaign: str | None = None
 
     def has_expired(self, moment: datetime) -> bool:
         return self.expires_at is not None and moment >= self.expires_at
+
+    def destination(self, moment: datetime) -> str | None:
+        """Return where a visitor should be sent now, or None when the link is gone.
+
+        An expired link with a fallback still has somewhere useful to send people: a
+        campaign page that has ended is better answered with the tariff listing than with
+        an error, particularly when the link is printed on something still circulating.
+        """
+        if not self.has_expired(moment):
+            return self.url
+        return self.fallback_url
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +92,9 @@ class Click:
     referrer: str | None
     country: str | None
     device: str
+    channel: str = CHANNEL_LINK
+    is_bot: bool = False
+    after_expiry: bool = False
 
 
 def generate_code(length: int) -> str:
@@ -118,3 +165,38 @@ def average_clicks_per_day(total_clicks: int, created_at: datetime, until: datet
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def is_automated(method: str, device: str) -> bool:
+    """Report whether a resolution came from a program rather than a person.
+
+    Two signals, both cheap. A HEAD request asks where a link goes without opening it,
+    which is what link checkers and preview services do. And the user agent may name
+    itself as a robot.
+    """
+    return method.upper() == "HEAD" or device == "bot"
+
+
+def channel_from(parameter: str | None) -> str:
+    """Read the channel a visitor arrived through, defaulting to a tapped link."""
+    return CHANNEL_QR if parameter == CHANNEL_QR else CHANNEL_LINK
+
+
+def forward_tracking_parameters(destination: str, incoming: dict[str, str]) -> str:
+    """Carry utm_* parameters from the short link through to the destination.
+
+    Whoever placed the link may tag it, and the page on the far side has its own analytics
+    that read those tags. Parameters already on the destination win, because the person
+    who wrote the destination was more specific than the person who tagged the link.
+    """
+    tracking = {
+        key: value for key, value in incoming.items() if key.startswith(TRACKING_PREFIX)
+    }
+    if not tracking:
+        return destination
+
+    parts = urlsplit(destination)
+    merged = dict(parse_qsl(parts.query, keep_blank_values=True))
+    for key, value in tracking.items():
+        merged.setdefault(key, value)
+    return urlunsplit(parts._replace(query=urlencode(merged)))

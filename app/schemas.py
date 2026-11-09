@@ -28,6 +28,15 @@ class ShortenRequest(BaseModel):
         default=None,
         description="When the link stops resolving. A timestamp without a zone is read as UTC.",
     )
+    fallback_url: HttpUrl | None = Field(
+        default=None,
+        description="Where to send visitors once the link has expired, instead of answering 410.",
+    )
+    campaign: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Groups links placed for the same campaign, so they can be read together.",
+    )
 
     @field_validator("expires_at")
     @classmethod
@@ -47,6 +56,8 @@ class ShortenResponse(BaseModel):
     code: str
     short_url: str
     expires_at: datetime | None = None
+    fallback_url: str | None = None
+    campaign: str | None = None
 
 
 class StatsResponse(BaseModel):
@@ -60,10 +71,14 @@ class StatsResponse(BaseModel):
     code: str
     url: str
     label: str | None
+    campaign: str | None
     created_at: datetime
     expires_at: datetime | None
     is_expired: bool
+    fallback_url: str | None
     total_clicks: int
+    bot_clicks: int
+    expired_clicks: int
     first_clicked_at: datetime | None
     last_clicked_at: datetime | None
     average_clicks_per_day: float
@@ -72,4 +87,29 @@ class StatsResponse(BaseModel):
     clicks_by_weekday: dict[str, int]
     clicks_by_country: dict[str, int]
     clicks_by_device: dict[str, int]
+    clicks_by_channel: dict[str, int]
     top_referrers: dict[str, int]
+
+
+class CampaignLink(BaseModel):
+    """One link within a campaign."""
+
+    code: str
+    url: str
+    label: str | None
+    total_clicks: int
+
+
+class CampaignStatsResponse(BaseModel):
+    """The body returned by GET /stats/campaign/{campaign}.
+
+    Answers the question a campaign raises rather than a link does: which placement worked.
+    """
+
+    campaign: str
+    total_clicks: int
+    bot_clicks: int
+    links: list[CampaignLink]
+    clicks_by_channel: dict[str, int]
+    clicks_by_country: dict[str, int]
+    clicks_by_device: dict[str, int]
