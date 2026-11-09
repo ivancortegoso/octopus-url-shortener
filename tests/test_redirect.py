@@ -20,27 +20,38 @@ def test_following_a_code_redirects_to_the_original_url(client: TestClient) -> N
 
 
 def test_an_unknown_code_returns_404(client: TestClient) -> None:
-    response = client.get("/nothing", follow_redirects=False)
-
-    assert response.status_code == 404
+    assert client.get("/nothing", follow_redirects=False).status_code == 404
 
 
-def test_following_a_code_records_the_click(
-    client: TestClient, storage: InMemoryStorage
-) -> None:
+def test_following_a_code_records_the_click(client: TestClient, storage: InMemoryStorage) -> None:
     code = _shorten(client)
 
     client.get(
         f"/{code}",
         follow_redirects=False,
-        headers={"referer": "https://news.example", "user-agent": "pytest"},
+        headers={
+            "referer": "https://news.example",
+            "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)",
+            "cf-ipcountry": "es",
+        },
     )
 
     assert len(storage.clicks) == 1
     click = storage.clicks[0]
     assert click.code == code
     assert click.referrer == "https://news.example"
-    assert click.user_agent == "pytest"
+    assert click.country == "ES"
+    assert click.device == "mobile"
+
+
+def test_a_click_without_an_edge_country_records_none(
+    client: TestClient, storage: InMemoryStorage
+) -> None:
+    code = _shorten(client)
+
+    client.get(f"/{code}", follow_redirects=False)
+
+    assert storage.clicks[0].country is None
 
 
 def test_an_unknown_code_records_no_click(client: TestClient, storage: InMemoryStorage) -> None:

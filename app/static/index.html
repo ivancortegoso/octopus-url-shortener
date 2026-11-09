@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Link analytics</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --panel: #ffffff; --ink: #1a1a19; --muted: #6b6b68;
+    --line: #e4e4e1; --accent: #2f6f4e; --accent-soft: #e8f1ec; --warn: #9a3412;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17171a; --panel: #1f1f23; --ink: #ececea; --muted: #9b9b97;
+      --line: #32323a; --accent: #6fbf95; --accent-soft: #223029; --warn: #f0a070;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0 0 24px; color: var(--muted); font-size: 0.9rem; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  input {
+    flex: 1 1 260px; padding: 10px 12px; font: inherit; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+    color: #fff; background: var(--accent); border: 0; border-radius: var(--radius);
+  }
+  button:hover { filter: brightness(1.08); }
+  .msg { padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+  .msg[data-tone="error"] { color: var(--warn); border-color: currentColor; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .stack { display: grid; gap: 16px; }
+  .destination { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; }
+  .destination a { color: var(--accent); word-break: break-all; }
+  .destination h2 { font-size: 1rem; margin: 0 0 6px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: var(--accent-soft); color: var(--accent); }
+  .tag[data-tone="expired"] { background: transparent; color: var(--warn); border: 1px solid currentColor; }
+  .qr { text-align: center; }
+  .qr img { width: 132px; height: 132px; image-rendering: pixelated; border-radius: 6px; background: #fff; padding: 6px; }
+  .qr a { display: block; margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .kpi dt { margin: 0 0 4px; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .kpi dd { margin: 0; font-size: 1.45rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi dd small { display: block; font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 14px; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 112px; }
+  .bars div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .bars i { display: block; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; }
+  .bars span { margin-top: 5px; font-size: 0.62rem; color: var(--muted); text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem; }
+  th { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  td:last-child, th:last-child { text-align: right; }
+  tr:last-child td { border-bottom: 0; }
+  .empty { color: var(--muted); font-size: 0.86rem; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 0.78rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Link analytics</h1>
+    <p>Enter a short code, or paste a short link, to see how it has performed.</p>
+  </header>
+
+  <form id="lookup">
+    <label for="code" class="visually-hidden" hidden>Short code</label>
+    <input id="code" name="code" placeholder="black-friday" autocomplete="off" required>
+    <button type="submit">Look up</button>
+  </form>
+
+  <p id="message" class="msg" hidden></p>
+
+  <div id="report" class="stack" hidden>
+    <section class="card destination">
+      <div>
+        <h2 id="label">Destination</h2>
+        <a id="url" href="#" rel="noreferrer noopener"></a>
+        <p id="lifetime" class="empty"></p>
+      </div>
+      <div class="qr">
+        <img id="qr" alt="QR code for this short link">
+        <a id="qr-download" download>Download PNG</a>
+      </div>
+    </section>
+
+    <dl class="kpis">
+      <div class="kpi"><dt>Total clicks</dt><dd id="total">0</dd></div>
+      <div class="kpi"><dt>Average per day</dt><dd id="average">0</dd></div>
+      <div class="kpi"><dt>First click</dt><dd id="first">—</dd></div>
+      <div class="kpi"><dt>Last click</dt><dd id="last">—</dd></div>
+    </dl>
+
+    <div class="charts">
+      <section class="card">
+        <h3>By hour of day (UTC)</h3>
+        <div id="hours" class="bars"></div>
+      </section>
+      <section class="card">
+        <h3>By day of week (UTC)</h3>
+        <div id="weekdays" class="bars"></div>
+      </section>
+    </div>
+
+    <div class="charts">
+      <section class="card"><h3>Countries</h3><div id="countries"></div></section>
+      <section class="card"><h3>Devices</h3><div id="devices"></div></section>
+      <section class="card"><h3>Referrers</h3><div id="referrers"></div></section>
+    </div>
+  </div>
+
+  <footer>
+    Reads the public <code>/stats/{code}</code> endpoint. Countries are resolved at the
+    network edge and stored as a two-letter code; no IP addresses are recorded.
+  </footer>
+</div>
+
+<script>
+  const form = document.getElementById("lookup");
+  const message = document.getElementById("message");
+  const report = document.getElementById("report");
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  /** Accept a bare code or a full short link and return just the code. */
+  function extractCode(value) {
+    const trimmed = value.trim().replace(/\/+$/, "");
+    const lastSegment = trimmed.split("/").pop() || "";
+    return lastSegment;
+  }
+
+  function show(text, tone) {
+    message.textContent = text;
+    message.dataset.tone = tone || "";
+    message.hidden = false;
+    report.hidden = true;
+  }
+
+  function formatMoment(value) {
+    if (!value) return "—";
+    const date = new Date(value);
+    return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function renderBars(container, labels, counts) {
+    const peak = Math.max(1, ...labels.map((label) => counts[label] || 0));
+    container.replaceChildren(
+      ...labels.map((label) => {
+        const hits = counts[label] || 0;
+        const column = document.createElement("div");
+        const bar = document.createElement("i");
+        bar.style.height = `${(hits / peak) * 100}%`;
+        bar.style.opacity = hits ? "1" : "0.18";
+        const caption = document.createElement("span");
+        caption.textContent = label;
+        column.append(bar, caption);
+        column.title = `${label}: ${hits} click${hits === 1 ? "" : "s"}`;
+        return column;
+      }),
+    );
+  }
+
+  function renderTable(container, heading, counts) {
+    const entries = Object.entries(counts);
+    if (!entries.length) {
+      container.replaceChildren(
+        Object.assign(document.createElement("p"), {
+          className: "empty",
+          textContent: "Nothing recorded yet.",
+        }),
+      );
+      return;
+    }
+
+    const table = document.createElement("table");
+    const head = table.createTHead().insertRow();
+    for (const text of [heading, "Clicks"]) {
+      const cell = document.createElement("th");
+      cell.textContent = text;
+      head.append(cell);
+    }
+    const body = table.createTBody();
+    for (const [name, hits] of entries) {
+      const row = body.insertRow();
+      row.insertCell().textContent = name;
+      row.insertCell().textContent = hits;
+    }
+    container.replaceChildren(table);
+  }
+
+  function render(stats) {
+    document.getElementById("label").textContent = stats.label || stats.code;
+    const url = document.getElementById("url");
+    url.textContent = stats.url;
+    url.href = stats.url;
+
+    const lifetime = document.getElementById("lifetime");
+    const created = `Created ${formatMoment(stats.created_at)}`;
+    if (stats.is_expired) {
+      lifetime.innerHTML = `${created} · <span class="tag" data-tone="expired">Expired</span>`;
+    } else if (stats.expires_at) {
+      lifetime.innerHTML = `${created} · <span class="tag">Expires ${formatMoment(stats.expires_at)}</span>`;
+    } else {
+      lifetime.textContent = `${created} · No expiry`;
+    }
+
+    document.getElementById("qr").src = `/qr/${encodeURIComponent(stats.code)}`;
+    document.getElementById("qr-download").href = `/qr/${encodeURIComponent(stats.code)}`;
+
+    document.getElementById("total").textContent = stats.total_clicks;
+    document.getElementById("average").textContent = stats.average_clicks_per_day;
+    document.getElementById("first").innerHTML =
+      `<small>${formatMoment(stats.first_clicked_at)}</small>`;
+    document.getElementById("last").innerHTML =
+      `<small>${formatMoment(stats.last_clicked_at)}</small>`;
+
+    renderBars(document.getElementById("hours"), HOURS, stats.clicks_by_hour);
+    renderBars(document.getElementById("weekdays"), WEEKDAYS, stats.clicks_by_weekday);
+    renderTable(document.getElementById("countries"), "Country", stats.clicks_by_country);
+    renderTable(document.getElementById("devices"), "Device", stats.clicks_by_device);
+    renderTable(document.getElementById("referrers"), "Referrer", stats.top_referrers);
+
+    message.hidden = true;
+    report.hidden = false;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const code = extractCode(document.getElementById("code").value);
+    if (!code) {
+      show("Enter a short code.", "error");
+      return;
+    }
+
+    show("Loading…");
+    try {
+      const response = await fetch(`/stats/${encodeURIComponent(code)}`);
+      if (response.status === 404) {
+        show(`No link is stored under “${code}”.`, "error");
+        return;
+      }
+      if (!response.ok) {
+        show(`The API answered with HTTP ${response.status}.`, "error");
+        return;
+      }
+      render(await response.json());
+    } catch {
+      show("The API could not be reached. Is the service running?", "error");
+    }
+  });
+
+  // A code in the address bar (/app?code=black-friday) loads straight away, so a link to
+  // a specific report can be shared.
+  const requested = new URLSearchParams(location.search).get("code");
+  if (requested) {
+    document.getElementById("code").value = requested;
+    form.requestSubmit();
+  }
+</script>
+</body>
+</html>

@@ -1,15 +1,29 @@
 """HTTP entry points for the URL shortener."""
 
+import io
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+import segno
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app.config import Settings, get_settings
 from app.dependencies import get_rate_limiter, get_storage
 from app.destinations import UnsafeDestinationError, ensure_safe_destination
-from app.domain import Click, Link, generate_code, is_reserved, utc_now
+from app.domain import (
+    Click,
+    Link,
+    average_clicks_per_day,
+    classify_device,
+    generate_code,
+    is_reserved,
+    normalise_country,
+    utc_now,
+    weekday_distribution,
+)
 from app.rate_limiting import SlidingWindowRateLimiter, client_key
 from app.schemas import ShortenRequest, ShortenResponse, StatsResponse
 from app.storage import CodeAlreadyExistsError, Storage
@@ -17,6 +31,13 @@ from app.storage import CodeAlreadyExistsError, Storage
 # A generated code can collide with one already stored. Retrying a bounded number of
 # times keeps the endpoint predictable instead of failing on an unlucky draw.
 MAX_CODE_ATTEMPTS = 5
+
+# Content delivery networks resolve the visitor's country at the edge and pass it on, so
+# the application never sees an IP address.
+COUNTRY_HEADERS = ("cf-ipcountry", "x-vercel-ip-country", "x-country-code")
+
+QR_SCALE = 6
+STATIC_DIR = Path(__file__).parent / "static"
 
 _settings = get_settings()
 
@@ -62,6 +83,12 @@ async def validation_error_handler(_: Request, error: RequestValidationError) ->
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": details})
 
 
+@app.get("/app", response_class=FileResponse, include_in_schema=False)
+def dashboard() -> FileResponse:
+    """Serve the single page that reads the public statistics API."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 @app.post(
     "/shorten",
     response_model=ShortenResponse,
@@ -75,23 +102,39 @@ def shorten(payload: ShortenRequest, storage: StorageDep, settings: SettingsDep)
     try:
         ensure_safe_destination(url, settings.base_url)
     except UnsafeDestinationError as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)
-        ) from error
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
     if payload.code is not None:
         link = _store_with_requested_code(
-            storage=storage, url=url, label=payload.label, code=payload.code
+            storage=storage,
+            url=url,
+            label=payload.label,
+            code=payload.code,
+            expires_at=payload.expires_at,
         )
     else:
         link = _store_with_unique_code(
-            storage=storage, url=url, label=payload.label, code_length=settings.code_length
+            storage=storage,
+            url=url,
+            label=payload.label,
+            code_length=settings.code_length,
+            expires_at=payload.expires_at,
         )
-    return ShortenResponse(code=link.code, short_url=f"{settings.base_url}/{link.code}")
+
+    return ShortenResponse(
+        code=link.code,
+        short_url=f"{settings.base_url}/{link.code}",
+        expires_at=link.expires_at,
+    )
 
 
 def _store_with_requested_code(
-    *, storage: Storage, url: str, label: str | None, code: str
+    *,
+    storage: Storage,
+    url: str,
+    label: str | None,
+    code: str,
+    expires_at: datetime | None,
 ) -> Link:
     """Store a link under a caller-chosen code, refusing one that is taken or reserved."""
     if is_reserved(code):
@@ -100,7 +143,13 @@ def _store_with_requested_code(
             detail=f"The code {code!r} is reserved by the service.",
         )
 
-    link = Link(code=code, url=url, label=label, created_at=utc_now())
+    link = Link(
+        code=code,
+        url=url,
+        label=label,
+        created_at=utc_now(),
+        expires_at=expires_at,
+    )
     try:
         storage.add_link(link)
     except CodeAlreadyExistsError as error:
@@ -112,11 +161,22 @@ def _store_with_requested_code(
 
 
 def _store_with_unique_code(
-    *, storage: Storage, url: str, label: str | None, code_length: int
+    *,
+    storage: Storage,
+    url: str,
+    label: str | None,
+    code_length: int,
+    expires_at: datetime | None,
 ) -> Link:
     """Store a link under a generated code, retrying a bounded number of collisions."""
     for _ in range(MAX_CODE_ATTEMPTS):
-        link = Link(code=generate_code(code_length), url=url, label=label, created_at=utc_now())
+        link = Link(
+            code=generate_code(code_length),
+            url=url,
+            label=label,
+            created_at=utc_now(),
+            expires_at=expires_at,
+        )
         try:
             storage.add_link(link)
         except CodeAlreadyExistsError:
@@ -142,15 +202,41 @@ def statistics(code: str, storage: StorageDep) -> StatsResponse:
     if stats is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
 
+    now = utc_now()
     return StatsResponse(
         code=stats.link.code,
         url=stats.link.url,
         label=stats.link.label,
         created_at=stats.link.created_at,
+        expires_at=stats.link.expires_at,
+        is_expired=stats.link.has_expired(now),
         total_clicks=stats.total_clicks,
+        first_clicked_at=stats.first_clicked_at,
         last_clicked_at=stats.last_clicked_at,
+        average_clicks_per_day=average_clicks_per_day(
+            stats.total_clicks, stats.link.created_at, now
+        ),
         clicks_per_day=stats.clicks_per_day,
+        clicks_by_hour=stats.clicks_by_hour,
+        clicks_by_weekday=weekday_distribution(stats.clicks_per_day),
+        clicks_by_country=stats.clicks_by_country,
+        clicks_by_device=stats.clicks_by_device,
         top_referrers=stats.top_referrers,
+    )
+
+
+@app.get("/qr/{code}", response_class=Response, summary="Render a short link as a QR code")
+def qr_code(code: str, storage: StorageDep, settings: SettingsDep) -> Response:
+    """Return the short URL as a PNG QR code, for print and screens."""
+    if storage.get_link(code) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
+
+    image = io.BytesIO()
+    segno.make(f"{settings.base_url}/{code}", error="m").save(image, kind="png", scale=QR_SCALE)
+    return Response(
+        content=image.getvalue(),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
@@ -168,13 +254,29 @@ def follow(code: str, request: Request, storage: StorageDep) -> RedirectResponse
     if link is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown short code.")
 
+    now = utc_now()
+    if link.has_expired(now):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE, detail="This link has expired."
+        )
+
     storage.add_click(
         Click(
             code=code,
-            clicked_at=utc_now(),
+            clicked_at=now,
             # The HTTP header has carried the historical misspelling "referer" since 1996.
             referrer=request.headers.get("referer"),
-            user_agent=request.headers.get("user-agent"),
+            country=_country_from_edge(request),
+            device=classify_device(request.headers.get("user-agent")),
         )
     )
     return RedirectResponse(url=link.url, status_code=status.HTTP_302_FOUND)
+
+
+def _country_from_edge(request: Request) -> str | None:
+    """Read the country the edge resolved, if any proxy in front supplied one."""
+    for header in COUNTRY_HEADERS:
+        country = normalise_country(request.headers.get(header))
+        if country is not None:
+            return country
+    return None
