@@ -40,3 +40,15 @@ def test_two_requests_for_the_same_url_get_different_codes(client: TestClient) -
     second = client.post("/shorten", json={"url": "https://example.com"}).json()
 
     assert first["code"] != second["code"]
+
+
+def test_a_private_destination_is_refused_with_400(client: TestClient) -> None:
+    response = client.post("/shorten", json={"url": "http://169.254.169.254/latest/meta-data/"})
+
+    assert response.status_code == 400
+
+
+def test_a_destination_pointing_at_the_service_is_refused_with_400(client: TestClient) -> None:
+    response = client.post("/shorten", json={"url": "http://localhost:8000/docs"})
+
+    assert response.status_code == 400
