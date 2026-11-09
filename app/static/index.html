@@ -80,12 +80,43 @@
   button:hover { filter: brightness(1.15); }
   button:disabled { opacity: 0.6; cursor: progress; }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field label { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.03em; }
-  .field .hint { font-size: 0.74rem; color: var(--muted); }
-  .field .error { font-size: 0.78rem; color: var(--highlight); }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px 14px; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field-head { display: flex; align-items: center; gap: 8px; }
+  .field label { font-size: 1rem; font-weight: 600; color: var(--ink); }
+  .field .error { font-size: 0.82rem; color: var(--highlight); }
   .field input[aria-invalid="true"] { border-color: var(--highlight); }
+
+  /* The explanation moved behind a mark: it is there when wanted and out of the way the
+     rest of the time. The text stays in the document and is named by aria-describedby, so
+     a screen reader reads it whether or not it is on screen. */
+  .info { position: relative; display: inline-flex; }
+  .info button {
+    width: 19px; height: 19px; padding: 0; border-radius: 50%;
+    display: grid; place-items: center; cursor: help;
+    font: 600 12px/1 Chromatophore, helvetica, arial, sans-serif;
+    color: var(--muted); background: transparent; border: 1px solid var(--line);
+  }
+  .info button:hover { color: var(--accent); border-color: var(--accent); }
+  .info .bubble {
+    position: absolute; bottom: calc(100% + 8px); left: -6px; z-index: 5;
+    width: max-content; max-width: 260px; padding: 9px 12px;
+    border-radius: 8px; border: 1px solid var(--line);
+    background: var(--raised); color: var(--ink);
+    font-size: 0.82rem; line-height: 1.45; font-weight: 400;
+    opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
+  }
+  .info:hover .bubble, .info button:focus-visible + .bubble { opacity: 1; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+
+  /* Chrome draws the date picker's own mark in black, which disappears on this background. */
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1); opacity: 0.75; cursor: pointer;
+  }
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
   .field--wide { grid-column: 1 / -1; }
   .actions { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
@@ -222,39 +253,84 @@
     <form id="create-form" novalidate>
       <div class="fields">
         <div class="field field--wide">
-          <label for="f-url">Where the link should lead</label>
+          <div class="field-head">
+            <label for="f-url">Where the link should lead</label>
+          </div>
           <input id="f-url" name="url" type="url" placeholder="https://example.com/offers" required>
         </div>
         <div class="field">
-          <label for="f-label">Name</label>
-          <input id="f-label" name="label" maxlength="200" placeholder="Text message to customers">
-          <span class="hint">Only you see this. It names the link in your reports.</span>
+          <div class="field-head">
+            <label for="f-label">Name</label>
+            <span class="info">
+              <button type="button" aria-describedby="h-label">
+                <span aria-hidden="true">i</span><span class="sr-only">About this field</span>
+              </button>
+              <span class="bubble" role="tooltip" id="h-label">Only you see this. It names the
+                link in your reports.</span>
+            </span>
+          </div>
+          <input id="f-label" name="label" maxlength="200" aria-describedby="h-label"
+                 placeholder="Text message to customers">
         </div>
         <div class="field">
-          <label for="f-code">Choose the ending</label>
-          <input id="f-code" name="code" pattern="[A-Za-z0-9_\-]{3,32}"
-                 placeholder="black-friday">
+          <div class="field-head">
+            <label for="f-code">Choose the ending</label>
+            <span class="info">
+              <button type="button" aria-describedby="h-code">
+                <span aria-hidden="true">i</span><span class="sr-only">About this field</span>
+              </button>
+              <span class="bubble" role="tooltip" id="h-code">Makes the link readable, as in
+                /black-friday. Leave it empty for a random one.</span>
+            </span>
+          </div>
           <!-- The hyphen is escaped on purpose: a pattern attribute is compiled with the
                regular expression `v` flag, under which a bare hyphen at the end of a
                character class will not compile, and a pattern that fails to compile is
                dropped by the browser without a word. -->
-          <span class="hint">Makes the link readable, as in /black-friday. Leave it empty for a random one.</span>
+          <input id="f-code" name="code" pattern="[A-Za-z0-9_\-]{3,32}" aria-describedby="h-code"
+                 placeholder="black-friday">
         </div>
         <div class="field">
-          <label for="f-campaign">Campaign</label>
-          <input id="f-campaign" name="campaign" maxlength="100" placeholder="black-friday-go">
-          <span class="hint">Give the same campaign to every link of one promotion to compare them.</span>
+          <div class="field-head">
+            <label for="f-campaign">Campaign</label>
+            <span class="info">
+              <button type="button" aria-describedby="h-campaign">
+                <span aria-hidden="true">i</span><span class="sr-only">About this field</span>
+              </button>
+              <span class="bubble" role="tooltip" id="h-campaign">Give the same campaign to
+                every link of one promotion to compare them.</span>
+            </span>
+          </div>
+          <input id="f-campaign" name="campaign" maxlength="100" aria-describedby="h-campaign"
+                 placeholder="black-friday-go">
         </div>
         <div class="field">
-          <label for="f-expires">Stop working on</label>
-          <input id="f-expires" name="expires_at" type="datetime-local">
-          <span class="hint">Leave it empty and the link never stops working.</span>
+          <div class="field-head">
+            <label for="f-expires">Stop working on</label>
+            <span class="info">
+              <button type="button" aria-describedby="h-expires">
+                <span aria-hidden="true">i</span><span class="sr-only">About this field</span>
+              </button>
+              <span class="bubble" role="tooltip" id="h-expires">Leave it empty and the link
+                never stops working.</span>
+            </span>
+          </div>
+          <input id="f-expires" name="expires_at" type="datetime-local" aria-describedby="h-expires">
         </div>
         <div class="field">
-          <label for="f-fallback">Send people here afterwards</label>
-          <input id="f-fallback" name="fallback_url" type="url"
+          <div class="field-head">
+            <label for="f-fallback">Send people here afterwards</label>
+            <span class="info">
+              <button type="button" aria-describedby="h-fallback">
+                <span aria-hidden="true">i</span><span class="sr-only">About this field</span>
+              </button>
+              <span class="bubble" role="tooltip" id="h-fallback">Once the link has stopped
+                working, anyone opening it goes here instead. Leave it empty and they see a
+                page saying the link has expired.</span>
+            </span>
+          </div>
+          <input id="f-fallback" name="fallback_url" type="url" aria-describedby="h-fallback"
                  placeholder="https://example.com/tariffs">
-          <span class="hint">Once the link has stopped working, anyone opening it goes here instead. Leave it empty and they see a page saying the link has expired.</span>
         </div>
       </div>
       <div class="actions">
@@ -649,7 +725,7 @@
 
   function clearFieldError(field) {
     field.removeAttribute("aria-invalid");
-    field.parentElement.querySelector(".error")?.remove();
+    field.closest(".field").querySelector(".error")?.remove();
   }
 
   function markFieldError(field, text) {
@@ -658,7 +734,7 @@
     const note = document.createElement("span");
     note.className = "error";
     note.textContent = text;
-    field.parentElement.append(note);
+    field.closest(".field").append(note);
   }
 
   /**
